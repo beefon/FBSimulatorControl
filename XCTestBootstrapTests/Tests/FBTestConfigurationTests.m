@@ -53,6 +53,7 @@
     testsToSkip:[NSSet set]
     targetApplicationPath:@"targetAppPath"
     targetApplicationBundleID:@"targetBundleID"
+    testApplicationDependencies:nil
     automationFrameworkPath:nil
     savePath:savePath
     error:&error];
