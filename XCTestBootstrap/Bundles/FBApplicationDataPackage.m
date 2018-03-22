@@ -136,6 +136,7 @@ static NSString *const FBTestPlanDirectoryName = @"TestPlans";
    testsToSkip:nil
    targetApplicationPath:nil
    targetApplicationBundleID:nil
+   testApplicationDependencies:nil
    automationFrameworkPath:nil
    savePath:[localTestPlanDirPath stringByAppendingPathComponent:testConfigurationFileName]
    error:&innerError];

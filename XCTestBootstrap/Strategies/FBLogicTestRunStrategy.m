@@ -105,7 +105,7 @@
   [environment addEntriesFromDictionary:self.configuration.processUnderTestEnvironment];
 
   // Get the Launch Path and Arguments for the xctest process.
-  NSString *testSpecifier = self.configuration.testFilter ?: @"All";
+  NSString *testSpecifier = self.configuration.testFilters.firstObject ?: @"All";
   NSString *launchPath = xctestPath;
   NSArray<NSString *> *arguments = @[@"-XCTest", testSpecifier, self.configuration.testBundlePath];
 

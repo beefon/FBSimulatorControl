@@ -1,3 +1,9 @@
+# This is a fork
+
+This fork is different to the main repo, the main changes are related to fbxctest, please refer to the README.md in fbxctest folder:
+
+[Navigate to fbxctest subfolder](https://github.com/beefon/FBSimulatorControl/tree/master/fbxctest)
+
 # FBSimulatorControl
 A macOS library for managing, booting and interacting with multiple iOS Simulators simultaneously.
 

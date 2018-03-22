@@ -10,6 +10,10 @@
 #import <Foundation/Foundation.h>
 
 #import <XCTestBootstrap/XCTestBootstrap.h>
+#import <FBSimulatorControl/FBSimulatorControlConfiguration.h>
+
+@protocol FBXCTestSimulatorConfigurator;
+@protocol FBControlCoreLogger;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -24,22 +28,11 @@ NS_ASSUME_NONNULL_BEGIN
  @param arguments the Arguments to the fbxctest process
  @param environment environment additions for the process under test.
  @param workingDirectory the Working Directory to use.
- @param error an error out for any error that occurs
- @return a new test run configuration.
- */
-+ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory error:(NSError **)error;
-
-/**
- Creates and loads a configuration from arguments.
-
- @param arguments the Arguments to the fbxctest process
- @param environment environment additions for the process under test.
- @param workingDirectory the Working Directory to use.
  @Param timeout the timeout of the test.
  @param error an error out for any error that occurs
  @return a new test run configuration.
  */
-+ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory timeout:(NSTimeInterval)timeout error:(NSError **)error;
++ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory timeout:(NSTimeInterval)timeout logger:(nullable id<FBControlCoreLogger>)logger error:(NSError **)error;
 
 /**
  The Designated Inititalizer
@@ -47,7 +40,10 @@ NS_ASSUME_NONNULL_BEGIN
  @param configuration the configuration for the test run.
  @param destination the destination to run against.
  */
-+ (instancetype)commandLineWithConfiguration:(FBXCTestConfiguration *)configuration destination:(FBXCTestDestination *)destination;
++ (instancetype)commandLineWithConfiguration:(FBXCTestConfiguration *)configuration
+                                 destination:(FBXCTestDestination *)destination
+                      simulatorConfigurators:(NSArray<id<FBXCTestSimulatorConfigurator>> *)simulatorConfigurators
+                  simulatorManagementOptions:(FBSimulatorManagementOptions)simulatorManagementOptions;
 
 #pragma mark Properties
 
@@ -73,6 +69,12 @@ NS_ASSUME_NONNULL_BEGIN
  The Timeout to perform all operations.
  */
 @property (nonatomic, assign, readonly) NSTimeInterval globalTimeout;
+
+#pragma mark Simulator Configuration
+
+@property (nonatomic, copy, readonly) NSArray<id<FBXCTestSimulatorConfigurator>> *simulatorConfigurators;
+
+@property (nonatomic, assign, readonly) FBSimulatorManagementOptions simulatorManagementOptions;
 
 @end
 

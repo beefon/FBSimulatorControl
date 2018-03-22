@@ -28,6 +28,7 @@
 @property (nonatomic, copy) NSSet<NSString *> *testsToSkip;
 @property (nonatomic, copy) NSString *targetApplicationBundleID;
 @property (nonatomic, copy) NSString *targetApplicationPath;
+@property (nonatomic, copy) NSDictionary<NSString *, NSString *> *testApplicationDependencies;
 @property (nonatomic, copy) NSString *automationFrameworkPath;
 @end
 
@@ -69,6 +70,12 @@
   return self;
 }
 
+- (instancetype)withTestApplicationDependencies:(NSDictionary<NSString *, NSString *> *)testApplicationDependencies
+{
+  self.testApplicationDependencies = [testApplicationDependencies copy];
+  return self;
+}
+
 - (instancetype)withAutomationFrameworkPath:(NSString *)automationFrameworkPath
 {
   self.automationFrameworkPath = automationFrameworkPath;
@@ -99,6 +106,7 @@
       testsToSkip:self.testsToSkip
       targetApplicationPath:self.targetApplicationPath
       targetApplicationBundleID:self.targetApplicationBundleID
+      testApplicationDependencies:self.testApplicationDependencies
       automationFrameworkPath:self.automationFrameworkPath
       savePath:[testBundle.path stringByAppendingPathComponent:testConfigurationFileName]
       error:&innerError];
