@@ -46,7 +46,7 @@
   NSDictionary<NSString *, NSString *> *processEnvironment = @{@"FOO" : @"BAR"};
   NSArray *arguments = @[ @"run-tests", @"-sdk", @"macosx", @"-logicTest", testBundlePath];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory error:&error];
+    FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
   FBXCTestConfiguration *configuration = commandLine.configuration;
@@ -65,9 +65,11 @@
       testBundlePath:testBundlePath
       waitForDebugger:NO
       timeout:0
-      testFilter:nil
+      testFilters:nil
       mirroring:FBLogicTestMirrorFileLogs]
-    destination:[[FBXCTestDestinationMacOSX alloc] init]];
+    destination:[[FBXCTestDestinationMacOSX alloc] init]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 }
 
@@ -83,7 +85,7 @@
   NSDictionary<NSString *, NSString *> *processEnvironment = @{@"FOO" : @"BAR"};
   NSArray *arguments = @[ @"run-tests", @"-sdk", @"macosx", @"-destination", @"name=iPhone 6", @"-logicTest", testBundlePath];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory error:&error];
+    FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
   FBXCTestConfiguration *configuration = commandLine.configuration;
@@ -101,9 +103,11 @@
       testBundlePath:testBundlePath
       waitForDebugger:NO
       timeout:0
-      testFilter:nil
+      testFilters:nil
       mirroring:FBLogicTestMirrorFileLogs]
-    destination:[[FBXCTestDestinationMacOSX alloc] init]];
+    destination:[[FBXCTestDestinationMacOSX alloc] init]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 }
 
@@ -118,7 +122,7 @@
   NSString *testBundlePath = [FBXCTestKitFixtures macUnitTestBundlePath];
   NSArray *arguments = @[ @"run-tests", @"-sdk", @"macosx", @"-logicTest", testBundlePath, @"-listTestsOnly" ];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:@{} workingDirectory:workingDirectory error:&error];
+  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:@{} workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
   FBXCTestConfiguration *configuration = commandLine.configuration;
@@ -136,7 +140,9 @@
       runnerAppPath:nil
       waitForDebugger:NO
       timeout:0]
-    destination:[[FBXCTestDestinationMacOSX alloc] init]];
+    destination:[[FBXCTestDestinationMacOSX alloc] init]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 }
 
@@ -151,7 +157,7 @@
   NSString *testBundlePath = [FBXCTestKitFixtures macUnitTestBundlePath];
   NSArray *arguments = @[ @"run-tests", @"-sdk", @"macosx", @"-destination", @"name=iPhone 6", @"-logicTest", testBundlePath, @"-listTestsOnly" ];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:@{} workingDirectory:workingDirectory error:&error];
+  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:@{} workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
   FBXCTestConfiguration *configuration = commandLine.configuration;
@@ -169,7 +175,9 @@
       runnerAppPath:nil
       waitForDebugger:NO
       timeout:0]
-    destination:[[FBXCTestDestinationMacOSX alloc] init]];
+    destination:[[FBXCTestDestinationMacOSX alloc] init]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 }
 

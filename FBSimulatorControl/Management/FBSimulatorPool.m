@@ -64,13 +64,17 @@
 {
   FBSimulatorAllocationOptions options = [self popAllocation:simulator];
   dispatch_queue_t workQueue = simulator.workQueue;
+  BOOL deleteOnFree = (options & FBSimulatorAllocationOptionsDeleteOnFree) == FBSimulatorAllocationOptionsDeleteOnFree;
+  BOOL eraseOnFree = (options & FBSimulatorAllocationOptionsEraseOnFree) == FBSimulatorAllocationOptionsEraseOnFree;
+  if (!deleteOnFree && !eraseOnFree) {
+    return [FBFuture futureWithResult:NSNull.null];
+  }
 
   // Killing is a pre-requesite for deleting/erasing
   return [[[[self.set
     killSimulator:simulator]
     rephraseFailure:@"Failed to Free Device in Killing Device"]
     onQueue:workQueue fmap:^(id _) {
-      BOOL deleteOnFree = (options & FBSimulatorAllocationOptionsDeleteOnFree) == FBSimulatorAllocationOptionsDeleteOnFree;
       if (deleteOnFree) {
         return [[[self.set
           deleteSimulator:simulator]
@@ -85,7 +89,6 @@
         return [FBFuture futureWithResult:NSNull.null];
       }
       // Otherwise check we should delete, then do it.
-      BOOL eraseOnFree = (options & FBSimulatorAllocationOptionsEraseOnFree) == FBSimulatorAllocationOptionsEraseOnFree;
       if (eraseOnFree) {
         return [[simulator
           erase]
