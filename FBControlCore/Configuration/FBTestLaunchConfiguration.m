@@ -18,7 +18,7 @@
 
 @implementation FBTestLaunchConfiguration
 
-- (instancetype)initWithTestBundlePath:(NSString *)testBundlePath applicationLaunchConfiguration:(FBApplicationLaunchConfiguration *)applicationLaunchConfiguration testHostPath:(NSString *)testHostPath timeout:(NSTimeInterval)timeout initializeUITesting:(BOOL)initializeUITesting testsToRun:(NSSet<NSString *> *)testsToRun testsToSkip:(NSSet<NSString *> *)testsToSkip targetApplicationPath:(NSString *)targetApplicationPath targetApplicationBundleID:(NSString *)targetApplicaitonBundleID xcTestRunProperties:(NSDictionary *)xcTestRunProperties resultBundlePath:(NSString *)resultBundlePath
+- (instancetype)initWithTestBundlePath:(NSString *)testBundlePath applicationLaunchConfiguration:(FBApplicationLaunchConfiguration *)applicationLaunchConfiguration testHostPath:(NSString *)testHostPath timeout:(NSTimeInterval)timeout initializeUITesting:(BOOL)initializeUITesting testsToRun:(NSSet<NSString *> *)testsToRun testsToSkip:(NSSet<NSString *> *)testsToSkip targetApplicationPath:(NSString *)targetApplicationPath targetApplicationBundleID:(NSString *)targetApplicaitonBundleID testApplicationDependencies:(NSDictionary<NSString *, NSString *> *)testApplicationDependencies xcTestRunProperties:(NSDictionary *)xcTestRunProperties resultBundlePath:(NSString *)resultBundlePath
 {
   self = [super init];
   if (!self) {
@@ -34,6 +34,7 @@
   _testsToSkip = testsToSkip;
   _targetApplicationPath = targetApplicationPath;
   _targetApplicationBundleID = targetApplicaitonBundleID;
+  _testApplicationDependencies = [testApplicationDependencies copy];
   _xcTestRunProperties = xcTestRunProperties;
   _resultBundlePath = resultBundlePath;
 
@@ -53,6 +54,7 @@
     testsToSkip:[NSSet set]
     targetApplicationPath:nil
     targetApplicationBundleID:nil
+    testApplicationDependencies:nil
     xcTestRunProperties:nil
     resultBundlePath:nil];
 }
@@ -69,6 +71,7 @@
     testsToSkip:self.testsToSkip
     targetApplicationPath:self.targetApplicationPath
     targetApplicationBundleID:self.targetApplicationBundleID
+    testApplicationDependencies:self.testApplicationDependencies
     xcTestRunProperties: self.xcTestRunProperties
     resultBundlePath:self.resultBundlePath];
 }
@@ -85,6 +88,7 @@
     testsToSkip:self.testsToSkip
     targetApplicationPath:self.targetApplicationPath
     targetApplicationBundleID:self.targetApplicationBundleID
+    testApplicationDependencies:self.testApplicationDependencies
     xcTestRunProperties: self.xcTestRunProperties
     resultBundlePath:self.resultBundlePath];
 
@@ -102,6 +106,7 @@
     testsToSkip:self.testsToSkip
     targetApplicationPath:self.targetApplicationPath
     targetApplicationBundleID:self.targetApplicationBundleID
+    testApplicationDependencies:self.testApplicationDependencies
     xcTestRunProperties: self.xcTestRunProperties
     resultBundlePath:self.resultBundlePath];
 }
@@ -118,6 +123,7 @@
     testsToSkip:self.testsToSkip
     targetApplicationPath:self.targetApplicationPath
     targetApplicationBundleID:self.targetApplicationBundleID
+    testApplicationDependencies:self.testApplicationDependencies
     xcTestRunProperties: self.xcTestRunProperties
     resultBundlePath:self.resultBundlePath];
 }
@@ -134,6 +140,7 @@
     testsToSkip:self.testsToSkip
     targetApplicationPath:self.targetApplicationPath
     targetApplicationBundleID:self.targetApplicationBundleID
+    testApplicationDependencies:self.testApplicationDependencies
     xcTestRunProperties: self.xcTestRunProperties
     resultBundlePath:self.resultBundlePath];
 }
@@ -150,6 +157,7 @@
     testsToSkip:testsToSkip
     targetApplicationPath:self.targetApplicationPath
     targetApplicationBundleID:self.targetApplicationBundleID
+    testApplicationDependencies:self.testApplicationDependencies
     xcTestRunProperties: self.xcTestRunProperties
     resultBundlePath:self.resultBundlePath];
 }
@@ -166,6 +174,7 @@
           testsToSkip:self.testsToSkip
           targetApplicationPath:targetApplicationPath
           targetApplicationBundleID:self.targetApplicationBundleID
+          testApplicationDependencies:self.testApplicationDependencies
           xcTestRunProperties: self.xcTestRunProperties
           resultBundlePath:self.resultBundlePath];
 
@@ -183,6 +192,30 @@
           testsToSkip:self.testsToSkip
           targetApplicationPath:self.targetApplicationPath
           targetApplicationBundleID:targetApplicationBundleID
+          testApplicationDependencies:self.testApplicationDependencies
+          xcTestRunProperties: self.xcTestRunProperties
+          resultBundlePath:self.resultBundlePath];
+}
+
+/**
+ Adds test application dependencies for UI tests.
+
+ @param testApplicationDependencies test application dependencies
+ @return builder
+ */
+- (instancetype)withTestApplicationDependencies:(NSDictionary<NSString *, NSString *> *)testApplicationDependencies
+{
+  return [[FBTestLaunchConfiguration alloc]
+          initWithTestBundlePath:self.testBundlePath
+          applicationLaunchConfiguration:self.applicationLaunchConfiguration
+          testHostPath:self.testHostPath
+          timeout:self.timeout
+          initializeUITesting:self.shouldInitializeUITesting
+          testsToRun:self.testsToRun
+          testsToSkip:self.testsToSkip
+          targetApplicationPath:self.targetApplicationPath
+          targetApplicationBundleID: self.targetApplicationBundleID
+          testApplicationDependencies: testApplicationDependencies
           xcTestRunProperties: self.xcTestRunProperties
           resultBundlePath:self.resultBundlePath];
 }
@@ -199,6 +232,7 @@
           testsToSkip:self.testsToSkip
           targetApplicationPath:self.targetApplicationPath
           targetApplicationBundleID:self.targetApplicationPath
+          testApplicationDependencies:self.testApplicationDependencies
           xcTestRunProperties: xcTestRunProperties
           resultBundlePath:self.resultBundlePath];
 }
@@ -215,6 +249,7 @@
           testsToSkip:self.testsToSkip
           targetApplicationPath:self.targetApplicationPath
           targetApplicationBundleID:self.targetApplicationPath
+          testApplicationDependencies:self.testApplicationDependencies
           xcTestRunProperties: self.xcTestRunProperties
           resultBundlePath:resultBundlePath];
 }
@@ -239,6 +274,7 @@
          (self.testHostPath == configuration.testHostPath || [self.testHostPath isEqualToString:configuration.testHostPath]) &&
          (self.targetApplicationBundleID == configuration.targetApplicationBundleID || [self.targetApplicationBundleID isEqualToString:configuration.targetApplicationBundleID]) &&
          (self.targetApplicationPath == configuration.targetApplicationPath || [self.targetApplicationPath isEqualToString:configuration.targetApplicationPath]) &&
+         (self.testApplicationDependencies == configuration.testApplicationDependencies || [self.testApplicationDependencies isEqual:configuration.testApplicationDependencies]) &&
          (self.testsToRun == configuration.testsToRun || [self.testsToRun isEqual:configuration.testsToRun]) &&
          (self.testsToSkip == configuration.testsToSkip || [self.testsToSkip isEqual:configuration.testsToSkip]) &&
          self.timeout == configuration.timeout &&
@@ -249,7 +285,7 @@
 
 - (NSUInteger)hash
 {
-  return self.testBundlePath.hash ^ self.applicationLaunchConfiguration.hash ^ self.testHostPath.hash ^ (unsigned long) self.timeout ^ (unsigned long) self.shouldInitializeUITesting ^ self.testsToRun.hash ^ self.testsToSkip.hash ^ self.targetApplicationPath.hash ^ self.targetApplicationBundleID.hash ^ self.xcTestRunProperties.hash ^ self.resultBundlePath.hash;
+  return self.testBundlePath.hash ^ self.applicationLaunchConfiguration.hash ^ self.testHostPath.hash ^ (unsigned long) self.timeout ^ (unsigned long) self.shouldInitializeUITesting ^ self.testsToRun.hash ^ self.testsToSkip.hash ^ self.targetApplicationPath.hash ^ self.targetApplicationBundleID.hash ^ self.testApplicationDependencies.hash ^ self.xcTestRunProperties.hash ^ self.resultBundlePath.hash;
 }
 
 #pragma mark FBDebugDescribeable
@@ -257,7 +293,7 @@
 - (NSString *)description
 {
   return [NSString stringWithFormat:
-    @"FBTestLaunchConfiguration TestBundlePath %@ | AppConfig %@ | HostPath %@ | UITesting %d | TestsToRun %@ | TestsToSkip %@ | Target application path %@ | Target application bundle id %@ xcTestRunProperties %@ | ResultBundlePath %@",
+    @"FBTestLaunchConfiguration TestBundlePath %@ | AppConfig %@ | HostPath %@ | UITesting %d | TestsToRun %@ | TestsToSkip %@ | Target application path %@ | Target application bundle id %@ xcTestRunProperties %@ | TestApplicationDependencies %@ | ResultBundlePath %@",
     self.testBundlePath,
     self.applicationLaunchConfiguration,
     self.testHostPath,
@@ -267,6 +303,7 @@
     self.targetApplicationPath,
     self.targetApplicationBundleID,
     self.xcTestRunProperties,
+    self.testApplicationDependencies,
     self.resultBundlePath
   ];
 }
@@ -292,6 +329,7 @@ static NSString *const KeyTestsToSkip = @"tests_to_skip";
 static NSString *const KeyTimeout = @"timeout";
 static NSString *const KeyTargetApplicationPath = @"targetApplicationPath";
 static NSString *const KeyTargetApplicationBundleID = @"targetApplicationBundleID";
+static NSString *const KeyTestApplicationDependencies = @"testApplicationDependencies";
 static NSString *const KeyXcTestRunProperties = @"xcTestRunProperties";
 static NSString *const KeyResultBundlePath = @"resultBundlePath";
 
@@ -307,6 +345,7 @@ static NSString *const KeyResultBundlePath = @"resultBundlePath";
     KeyTestsToSkip : self.testsToSkip.allObjects ?: NSNull.null,
     KeyTargetApplicationPath : self.targetApplicationPath ?: NSNull.null,
     KeyTargetApplicationBundleID : self.targetApplicationBundleID ?: NSNull.null,
+    KeyTestApplicationDependencies : self.testApplicationDependencies ?: NSNull.null,
     KeyXcTestRunProperties : self.xcTestRunProperties ?: NSNull.null,
     KeyResultBundlePath : self.resultBundlePath ?: NSNull.null,
   };
@@ -324,6 +363,12 @@ static NSString *const KeyResultBundlePath = @"resultBundlePath";
   if (targetApplicationBundleID && ![targetApplicationBundleID isKindOfClass:NSString.class]) {
     return [[FBControlCoreError
              describeFormat:@"%@ is not a String | Null for %@", targetApplicationBundleID, KeyBundlePath]
+            fail:error];
+  }
+  NSDictionary<NSString *, NSString *> *testApplicationDependencies = [FBCollectionOperations nullableValueForDictionary:json key:KeyTestApplicationDependencies];
+  if (testApplicationDependencies && ![testApplicationDependencies isKindOfClass:NSDictionary.class]) {
+    return [[FBControlCoreError
+             describeFormat:@"%@ is not a String | Null for %@", testApplicationDependencies, KeyTestApplicationDependencies]
             fail:error];
   }
   NSString *bundlePath = [FBCollectionOperations nullableValueForDictionary:json key:KeyBundlePath];
@@ -397,6 +442,7 @@ static NSString *const KeyResultBundlePath = @"resultBundlePath";
     testsToSkip:testsToSkip
     targetApplicationPath:targetApplicationPath
     targetApplicationBundleID:targetApplicationBundleID
+    testApplicationDependencies:testApplicationDependencies
     xcTestRunProperties:xcTestRunProperties
     resultBundlePath:resultBundlePath];
 }

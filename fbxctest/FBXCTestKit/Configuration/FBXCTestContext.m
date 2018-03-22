@@ -49,7 +49,11 @@
 {
   if (!self.simulatorFetcher) {
     NSError *error = nil;
-    FBXCTestSimulatorFetcher *fetcher = [FBXCTestSimulatorFetcher fetcherWithWorkingDirectory:commmandLine.configuration.workingDirectory logger:self.logger error:&error];
+    FBXCTestSimulatorFetcher *fetcher = [FBXCTestSimulatorFetcher fetcherWithWorkingDirectory:commmandLine.configuration.workingDirectory
+                                                                    simulatorManagementOptios:commmandLine.simulatorManagementOptions
+                                                                                configurators:commmandLine.simulatorConfigurators
+                                                                                       logger:self.logger
+                                                                                        error:&error];
     if (!fetcher) {
       return [FBFuture futureWithError:error];
     }

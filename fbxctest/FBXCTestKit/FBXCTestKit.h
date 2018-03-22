@@ -11,3 +11,4 @@
 #import <FBXCTestKit/FBXCTestCommandLine.h>
 #import <FBXCTestKit/FBXCTestContext.h>
 #import <FBXCTestKit/FBXCTestDestination.h>
+#import <FBXCTestKit/FBXCTestSimulatorConfigurator.h>
