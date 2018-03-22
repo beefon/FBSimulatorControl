@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -44,6 +46,38 @@ NS_ASSUME_NONNULL_BEGIN
  Injects the Shimulator Dylib into the launched process;
  */
 - (instancetype)injectingShimulator;
+
+/**
+ Creates a Process Output for a Simulator.
+
+ @param simulator the simulator to create the output for.
+ @return a Future that wraps an Array of the outputs.
+*/
+- (FBFuture<NSArray<FBProcessOutput *> *> *)createOutputForSimulator:(FBSimulator *)simulator;
+
+/**
+ Creates a FBDiagnostic for the location of the stdout, if applicable.
+
+ @param simulator the simulator to create the diagnostic for.
+ @return a Future that wraps a diagnostic, if one was created.
+ */
+- (FBFuture<id> *)createStdOutDiagnosticForSimulator:(FBSimulator *)simulator;
+
+/**
+ Creates a FBDiagnostic for the location of the stderr, if applicable.
+
+ @param simulator the simulator to create the diagnostic for.
+ @return a Future that wraps a diagnostic, if one was created.
+ */
+- (FBFuture<id> *)createStdErrDiagnosticForSimulator:(FBSimulator *)simulator;
+
+/**
+ Creates a FBDiagnostic for the location of the selector, if applicable.
+
+ @param simulator the simulator to create the diagnostic for.
+ @return a Future that wraps a diagnostic, if one was created.
+ */
+- (FBFuture<id> *)createDiagnosticForSelector:(SEL)selector simulator:(FBSimulator *)simulator;
 
 /**
  A Name used to distinguish between Launch Configurations.

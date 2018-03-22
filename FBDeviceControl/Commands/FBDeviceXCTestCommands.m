@@ -1,21 +1,19 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <FBControlCore/FBControlCore.h>
 
 #import <XCTestBootstrap/XCTestBootstrap.h>
 
-#import "FBAMDevice+Private.h"
-#import "FBAMDevice.h"
-#import "FBDevice+Private.h"
 #import "FBDevice.h"
-#import "FBDeviceControlError.h"
 #import "FBDeviceXCTestCommands.h"
-#import "FBAMDServiceConnection.h"
+#import "FBDeviceControlError.h"
 
 static inline id readFromDict(NSDictionary *dict, NSString *key, Class klass)
 {
@@ -251,15 +249,6 @@ static inline NSArray *readArrayFromDict(NSDictionary *dict, NSString *key)
   return [[FBDeviceControlError
     describeFormat:@"Cannot list the tests in bundle %@ as this is not supported on devices", bundlePath]
     failFuture];
-}
-
-- (FBFutureContext<NSNumber *> *)transportForTestManagerService
-{
-  return [[self.device.amDevice
-    startTestManagerService]
-    onQueue:self.device.workQueue pend:^(FBAMDServiceConnection *connection) {
-      return [FBFuture futureWithResult:@(connection.socket)];
-    }];
 }
 
 #pragma mark Private

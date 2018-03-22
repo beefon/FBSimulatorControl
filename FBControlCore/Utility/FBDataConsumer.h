@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -50,15 +52,87 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 /**
- Observation of a Data Consumer's lifecycle
+ Allows observation of a data consumer to observe.
  */
 @protocol FBDataConsumerLifecycle <NSObject>
 
 /**
- A Future that resolves when an there is no more data to write and any underlying resource managed by the consumer is released.
- At this point, consumers are safe to assume that any resource that the writer is wrapping is safe to use.
+ A Future that resolves when an end-of-file has been recieved.
+ This is helpful for ensuring that all consumer lines have been drained.
  */
-@property (nonatomic, strong, readonly) FBFuture<NSNull *> *finishedConsuming;
+@property (nonatomic, strong, readonly) FBFuture<NSNull *> *eofHasBeenReceived;
+
+@end
+
+/**
+ The non-mutating methods of a buffer.
+ */
+@protocol FBAccumulatingBuffer <FBDataConsumer, FBDataConsumerLifecycle>
+
+/**
+ Obtains a copy of the current output data.
+ */
+- (NSData *)data;
+
+/**
+ Obtains a copy of the current output data.
+ */
+- (NSArray<NSString *> *)lines;
+
+@end
+
+/**
+ The mutating methods of a buffer.
+ */
+@protocol FBConsumableBuffer <FBAccumulatingBuffer>
+
+/**
+ Consume the remainder of the buffer available, returning it as Data.
+ This will flush the entirity of the buffer.
+
+ @return all the current data in the buffer.
+ */
+- (nullable NSData *)consumeCurrentData;
+
+/**
+ Consume the remainder of the buffer available, returning it as a String.
+ This will flush the entirity of the buffer.
+
+ @return all the current data in the buffer as a string.
+ */
+- (nullable NSString *)consumeCurrentString;
+
+/**
+ Consumes until data recieved.
+
+ @param terminal the terminal.
+ @return all the data before the separator if there is data to consume, nil otherwise.
+ */
+- (nullable NSData *)consumeUntil:(NSData *)terminal;
+
+/**
+ Consume a line if one is available, returning it as Data.
+ This will flush the buffer of the lines that are consumed.
+
+ @return all the data before a newline if there is data to consume, nil otherwise.
+ */
+- (nullable NSData *)consumeLineData;
+
+/**
+ Consume a line if one is available, returning it as a String.
+ This will flush the buffer of the lines that are consumed.
+
+ @return all the data before a newline as a string if there is data to consume, nil otherwise.
+ */
+- (nullable NSString *)consumeLineString;
+
+/**
+ Notifies when there has been consumption to a terminal
+
+ @param terminal the terminal.
+ @return a future wrapping the read data.
+ */
+- (FBFuture<NSData *> *)consumeAndNotifyWhen:(NSData *)terminal;
 
 @end
 
@@ -95,55 +169,57 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 /**
- A consumer of data, passing output to a block.
+ Implementations of a line buffers.
+ This can then be consumed based on lines/strings.
+ Writes and reads are fully synchronized.
  */
-@interface FBBlockDataConsumer : NSObject
+@interface FBLineBuffer : NSObject
 
 /**
- Creates a consumer that delivers data when available.
- Data will be delivered synchronously.
+ A line buffer that is only mutated through consuming data.
 
- @param consumer the block to call when new data is available
- @return a new consumer.
+ @return a FBLineBuffer implementation.
  */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)synchronousDataConsumerWithBlock:(void (^)(NSData *))consumer;
++ (id<FBAccumulatingBuffer>)accumulatingBuffer;
+
+/**
+ A line buffer that is only mutated through consuming data.
+
+ @return a FBLineBuffer implementation.
+ */
++ (id<FBAccumulatingBuffer>)accumulatingBufferForMutableData:(NSMutableData *)data;
+
+/**
+ A line buffer that is appended to by consuming data and can be drained.
+
+ @return a FBConsumableBuffer implementation.
+ */
++ (id<FBConsumableBuffer>)consumableBuffer;
+
+@end
+
+/**
+ A Reader of Text Data, calling the callback when a full line is available.
+ */
+@interface FBLineDataConsumer : NSObject <FBDataConsumer, FBDataConsumerLifecycle>
 
 /**
  Creates a Consumer of lines from a block.
  Lines will be delivered synchronously.
 
  @param consumer the block to call when a line has been consumed.
- @return a new consumer.
+ @return a new Line Reader.
  */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)synchronousLineConsumerWithBlock:(void (^)(NSString *))consumer;
-
-/**
- Creates a consumer that delivers data when available.
- Data will be delivered asynchronously to the provided queue.
-
- @param queue the queue to consume on.
- @param consumer the block to call when new data is available
- @return a new consumer.
- */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)asynchronousDataConsumerOnQueue:(dispatch_queue_t)queue consumer:(void (^)(NSData *))consumer;
-
-/**
- Creates a consumer that delivers data when available.
- Data will be delivered asynchronously to a private queue.
-
- @param consumer the block to call when a line has been consumed.
- @return a new consumer.
- */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)asynchronousDataConsumerWithBlock:(void (^)(NSData *))consumer;
++ (instancetype)synchronousReaderWithConsumer:(void (^)(NSString *))consumer;
 
 /**
  Creates a Consumer of lines from a block.
  Lines will be delivered asynchronously to a private queue.
 
  @param consumer the block to call when a line has been consumed.
- @return a new consumer.
+ @return a new Line Reader.
  */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)asynchronousLineConsumerWithBlock:(void (^)(NSString *))consumer;
++ (instancetype)asynchronousReaderWithConsumer:(void (^)(NSString *))consumer;
 
 /**
  Creates a Consumer of lines from a block.
@@ -151,9 +227,9 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param queue the queue to call the consumer from.
  @param consumer the block to call when a line has been consumed.
- @return a new consumer.
+ @return a new Line Reader.
  */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)asynchronousLineConsumerWithQueue:(dispatch_queue_t)queue consumer:(void (^)(NSString *))consumer;
++ (instancetype)asynchronousReaderWithQueue:(dispatch_queue_t)queue consumer:(void (^)(NSString *))consumer;
 
 /**
  Creates a Consumer of lines from a block.
@@ -161,9 +237,9 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param queue the queue to call the consumer from.
  @param consumer the block to call when a line has been consumed.
- @return a new consumer.
+ @return a new Line Reader.
  */
-+ (id<FBDataConsumer, FBDataConsumerLifecycle>)asynchronousLineConsumerWithQueue:(dispatch_queue_t)queue dataConsumer:(void (^)(NSData *))consumer;
++ (instancetype)asynchronousReaderWithQueue:(dispatch_queue_t)queue dataConsumer:(void (^)(NSData *))consumer;
 
 @end
 

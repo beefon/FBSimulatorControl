@@ -1,212 +1,138 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTask.h"
 
-#include <spawn.h>
-
 #import "FBControlCoreError.h"
+#import "FBControlCoreGlobalConfiguration.h"
 #import "FBControlCoreLogger.h"
-#import "FBDataBuffer.h"
 #import "FBDataConsumer.h"
 #import "FBFileWriter.h"
 #import "FBLaunchedProcess.h"
-#import "FBProcessIO.h"
 #import "FBProcessStream.h"
 #import "FBTaskConfiguration.h"
+#import "NSRunLoop+FBControlCore.h"
 
 NSString *const FBTaskErrorDomain = @"com.facebook.FBControlCore.task";
 
-/**
- A protocol for abstracting over implementations of subprocesses.
- */
 @protocol FBTaskProcess <NSObject, FBLaunchedProcess>
 
-/**
- The designated initializer
+@property (nonatomic, assign, readonly) int terminationStatus;
+@property (nonatomic, assign, readonly) BOOL isRunning;
 
- @param configuration the configuration of the task.
- @param io the io attachment.
- @return a new FBTaskProcess Instance.
- */
-+ (FBFuture<id<FBTaskProcess>> *)processWithConfiguration:(FBTaskConfiguration *)configuration io:(FBProcessIOAttachment *)io;
-
-/**
- Send a signal to the process.
- Returns a future with the resolved exit code of the process.
- */
+- (void)launch;
+- (void)mountStandardOut:(id)stdOut;
+- (void)mountStandardErr:(id)stdErr;
+- (void)mountStandardIn:(id)stdIn;
 - (FBFuture<NSNumber *> *)sendSignal:(int)signo;
 
 @end
 
-static BOOL AddOutputFileActions(posix_spawn_file_actions_t *fileActions, FBProcessStreamAttachment *attachment, int targetFileDescriptor, NSError **error)
-{
-  if (!attachment) {
-    return YES;
-  }
-  NSCParameterAssert(attachment.mode == FBProcessStreamAttachmentModeOutput);
-  // dup the write end of the pipe to the target file descriptor i.e. stdout
-  // Files do not need to be closed in the launched process as POSIX_SPAWN_CLOEXEC_DEFAULT does this for us.
-  int sourceFileDescriptor = attachment.fileDescriptor;
-  int status = posix_spawn_file_actions_adddup2(fileActions, sourceFileDescriptor, targetFileDescriptor);
-  if (status != 0) {
-    return [[FBControlCoreError
-      describeFormat:@"Failed to dup input %d, to %d: %s", sourceFileDescriptor, targetFileDescriptor, strerror(status)]
-      failBool:error];
-  }
-  return YES;
-}
+@interface FBTaskProcess_NSTask : NSObject <FBTaskProcess>
 
-static BOOL AddInputFileActions(posix_spawn_file_actions_t *fileActions, FBProcessStreamAttachment *attachment, int targetFileDescriptor, NSError **error)
-{
-  if (!attachment) {
-    return YES;
-  }
-  NSCParameterAssert(attachment.mode == FBProcessStreamAttachmentModeInput);
-  // dup the read end of the pipe to the target file descriptor i.e. stdin
-  // Files do not need to be closed in the launched process as POSIX_SPAWN_CLOEXEC_DEFAULT does this for us.
-  int sourceFileDescriptor = attachment.fileDescriptor;
-  int status = posix_spawn_file_actions_adddup2(fileActions, sourceFileDescriptor, targetFileDescriptor);
-  if (status != 0) {
-    return [[FBControlCoreError
-      describeFormat:@"Failed to dup input %d, to %d: %s", sourceFileDescriptor, targetFileDescriptor, strerror(status)]
-      failBool:error];
-  }
-  return YES;
-}
-
-@interface FBTaskProcess_PosixSpawn : NSObject <FBTaskProcess>
-
-@property (nonatomic, strong, readonly) FBTaskConfiguration *configuration;
-@property (nonatomic, strong, nullable, readwrite) id stdIn;
-@property (nonatomic, strong, nullable, readwrite) id stdOut;
-@property (nonatomic, strong, nullable, readwrite) id stdErr;
+@property (nonatomic, strong, readwrite) NSTask *task;
+@property (nonatomic, strong, readonly) id<FBControlCoreLogger> logger;
 
 @end
 
-@implementation FBTaskProcess_PosixSpawn
+@implementation FBTaskProcess_NSTask
 
 @synthesize exitCode = _exitCode;
-@synthesize processIdentifier = _processIdentifier;
 
-+ (FBFuture<id<FBTaskProcess>> *)processWithConfiguration:(FBTaskConfiguration *)configuration io:(FBProcessIOAttachment *)io
++ (instancetype)fromConfiguration:(FBTaskConfiguration *)configuration
 {
-  // Convert the arguments to the argv expected by posix_spawn
-  NSArray<NSString *> *arguments = configuration.arguments;
-  char *argv[arguments.count + 2]; // 0th arg is launch path, last arg is NULL
-  argv[0] = (char *) configuration.launchPath.UTF8String;
-  argv[arguments.count + 1] = NULL;
-  for (NSUInteger index = 0; index < arguments.count; index++) {
-    argv[index + 1] = (char *) arguments[index].UTF8String; // Offset by the launch path arg.
-  }
-
-  // Convert the environment to the envp expected by posix_spawn
-  NSDictionary<NSString *, NSString *> *environment = configuration.environment;
-  NSArray<NSString *> *environmentNames = environment.allKeys;
-  char *envp[environment.count + 1];
-  envp[environment.count] = NULL;
-  for (NSUInteger index = 0; index < environmentNames.count; index++) {
-    NSString *name = environmentNames[index];
-    NSString *value = [NSString stringWithFormat:@"%@=%@", name, environment[name]];
-    envp[index] = (char *) value.UTF8String;
-  }
-
-  // Convert the file descriptors
-  posix_spawn_file_actions_t fileActions;
-  posix_spawn_file_actions_init(&fileActions);
-
-  NSError *error = nil;
-  if (!AddInputFileActions(&fileActions, io.stdIn, STDIN_FILENO, &error)) {
-    return [FBFuture futureWithError:error];
-  }
-  if (!AddOutputFileActions(&fileActions, io.stdOut, STDOUT_FILENO, &error)) {
-    return [FBFuture futureWithError:error];
-  }
-  if (!AddOutputFileActions(&fileActions, io.stdErr, STDERR_FILENO, &error)) {
-    return [FBFuture futureWithError:error];
-  }
-
-  // Make the spawn attributes
-  posix_spawnattr_t spawnAttributes;
-  posix_spawnattr_init(&spawnAttributes);
-
-  // No signals in the child process will be masked from whatever is set in the current process.
-  sigset_t mask;
-  sigemptyset(&mask);
-  posix_spawnattr_setsigmask(&spawnAttributes, &mask);
-
-  // All signals in the new process should have the default disposition.
-  sigfillset(&mask);
-  posix_spawnattr_setsigdefault(&spawnAttributes, &mask);
-
-  // Closes all file descriptors in the child that aren't duped. This prevents any file descriptors other than the ones we define being inherited by children.
-  posix_spawnattr_setflags(&spawnAttributes, POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK);
-
-  pid_t processIdentifier;
-  int status = posix_spawn(&processIdentifier, argv[0], &fileActions, &spawnAttributes, argv, envp);
-  posix_spawn_file_actions_destroy(&fileActions);
-  posix_spawnattr_destroy(&spawnAttributes);
-  if (status != 0) {
-    return [[FBControlCoreError
-      describeFormat:@"Failed to launch %@ with error %s", configuration, strerror(status)]
-      failFuture];
-  }
-
-  FBFuture<NSNumber *> *exitCode = [self exitCodeFutureForProcessIdentifier:processIdentifier logger:configuration.logger];
-  id<FBTaskProcess> process = [[self alloc] initWithProcessIdentifier:processIdentifier exitCode:exitCode];
-  return [FBFuture futureWithResult:process];
+  NSTask *task = [[NSTask alloc] init];
+  task.environment = configuration.environment;
+  task.launchPath = configuration.launchPath;
+  task.arguments = configuration.arguments;
+  return [[self alloc] initWithTask:task];
 }
 
-+ (FBFuture<NSNumber *> *)exitCodeFutureForProcessIdentifier:(pid_t)processIdentifier logger:(id<FBControlCoreLogger>)logger
-{
-  FBMutableFuture<NSNumber *> *exitCode = FBMutableFuture.future;
-  dispatch_queue_t queue = dispatch_queue_create("com.facebook.fbcontrolcore.task.posix_spawn.wait", DISPATCH_QUEUE_SERIAL);
-  dispatch_source_t source = dispatch_source_create(
-    DISPATCH_SOURCE_TYPE_PROC,
-    (uintptr_t) processIdentifier,
-    DISPATCH_PROC_EXIT,
-    queue
-  );
-  dispatch_source_set_event_handler(source, ^{
-    int status = 0;
-    if (waitpid(processIdentifier, &status, WNOHANG) == -1) {
-      [logger logFormat:@"Failed to get the exit status with waitpid: %s", strerror(errno)];
-    }
-    if (WIFEXITED(status)) {
-      [exitCode resolveWithResult:@(WEXITSTATUS(status))];
-    } else if (WIFSIGNALED(status)) {
-      [exitCode resolveWithResult:@(WTERMSIG(status))];
-    } else {
-      [exitCode resolveWithResult:@(status)];
-    }
-    // We only need a single notification and the dispatch_source must be retained until we resolve the future.
-    // Cancelling the source at the end will release the source as the event handler will no longer be referenced.
-    dispatch_cancel(source);
-  });
-  dispatch_resume(source);
-  return exitCode;
-}
-
-- (instancetype)initWithProcessIdentifier:(pid_t)processIdentifier exitCode:(FBFuture<NSNumber *> *)exitCode
+- (instancetype)initWithTask:(NSTask *)task
 {
   self = [super init];
   if (!self) {
     return nil;
   }
 
-  _processIdentifier = processIdentifier;
-  _exitCode = exitCode;
+  _task = task;
+  _exitCode = FBMutableFuture.future;
+  _logger = [[FBControlCoreGlobalConfiguration defaultLogger] withName:[NSString stringWithFormat:@"FBTask_%@", [task.launchPath lastPathComponent]]];
 
   return self;
 }
 
+- (pid_t)processIdentifier
+{
+  return self.task.processIdentifier;
+}
+
+- (int)terminationStatus
+{
+  return self.task.terminationStatus;
+}
+
+- (BOOL)isRunning
+{
+  return self.task.isRunning;
+}
+
+- (void)mountStandardOut:(id)stdOut
+{
+  self.task.standardOutput = stdOut;
+}
+
+- (void)mountStandardErr:(id)stdErr
+{
+  self.task.standardError = stdErr;
+}
+
+- (void)mountStandardIn:(id)stdIn
+{
+  self.task.standardInput = stdIn;
+}
+
+- (void)launch
+{
+  FBMutableFuture<NSNumber *> *exitCode = (FBMutableFuture *) self.exitCode;
+  id<FBControlCoreLogger> logger = self.logger;
+  self.task.terminationHandler = ^(NSTask *task) {
+    if (logger.level >= FBControlCoreLogLevelDebug) {
+      [logger logFormat:@"Task finished with exit code %d", task.terminationStatus];
+    }
+    [exitCode resolveWithResult:@(task.terminationStatus)];
+  };
+
+  NSString *arguments = [self.task.arguments componentsJoinedByString:@" "];
+  if (logger.level >= FBControlCoreLogLevelDebug) {
+    [self.logger logFormat:@"Running %@ %@ with environment %@",
+      self.task.launchPath,
+      arguments,
+      self.task.environment];
+  }
+  [self.task launch];
+}
+
 - (FBFuture<NSNumber *> *)sendSignal:(int)signo
 {
-  kill(self.processIdentifier, signo);
+  pid_t processIdentifier = self.processIdentifier;
+  switch (signo) {
+    case SIGTERM:
+      [self.task terminate];
+      break;
+    case SIGINT:
+      [self.task interrupt];
+      break;
+    default:
+      kill(processIdentifier, signo);
+      break;
+  }
   return self.exitCode;
 }
 
@@ -216,11 +142,16 @@ static BOOL AddInputFileActions(posix_spawn_file_actions_t *fileActions, FBProce
 
 @property (nonatomic, strong, readonly) dispatch_queue_t queue;
 @property (nonatomic, copy, readonly) NSSet<NSNumber *> *acceptableStatusCodes;
-@property (nonatomic, copy, readonly) NSString *configurationDescription;
-@property (nonatomic, copy, readonly) NSString *programName;
 
-@property (nonatomic, strong, readwrite) id<FBTaskProcess> process;
-@property (nonatomic, strong, nullable, readwrite) FBProcessIO *io;
+@property (nonatomic, strong, nullable, readwrite) id<FBTaskProcess> process;
+@property (nonatomic, strong, nullable, readwrite) FBProcessOutput *stdOutSlot;
+@property (nonatomic, strong, nullable, readwrite) FBProcessOutput *stdErrSlot;
+@property (nonatomic, strong, nullable, readwrite) FBProcessInput *stdInSlot;
+
+@property (nonatomic, copy, readwrite) NSString *configurationDescription;
+@property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *errorFuture;
+@property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *startedTeardownFuture;
+@property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *completedTeardownFuture;
 
 @end
 
@@ -230,25 +161,13 @@ static BOOL AddInputFileActions(posix_spawn_file_actions_t *fileActions, FBProce
 
 + (FBFuture<FBTask *> *)startTaskWithConfiguration:(FBTaskConfiguration *)configuration
 {
+  id<FBTaskProcess> process = [FBTaskProcess_NSTask fromConfiguration:configuration];
   dispatch_queue_t queue = dispatch_queue_create("com.facebook.fbcontrolcore.task", DISPATCH_QUEUE_SERIAL);
-  return [[[configuration.io
-    attach]
-    onQueue:queue fmap:^(FBProcessIOAttachment *attachment) {
-      // Everything is setup, launch the process now.
-      return [FBTaskProcess_PosixSpawn processWithConfiguration:configuration io:attachment];
-    }]
-    onQueue:queue map:^(id<FBTaskProcess> process) {
-      return [[self alloc]
-        initWithProcess:process
-        io:configuration.io
-        queue:queue
-        acceptableStatusCodes:configuration.acceptableStatusCodes
-        configurationDescription:configuration.description
-        programName:configuration.launchPath.lastPathComponent];
-    }];
+  FBTask *task = [[self alloc] initWithProcess:process stdOut:configuration.stdOut stdErr:configuration.stdErr stdIn:configuration.stdIn queue:queue acceptableStatusCodes:configuration.acceptableStatusCodes configurationDescription:configuration.description];
+  return [task launchTask];
 }
 
-- (instancetype)initWithProcess:(id<FBTaskProcess>)process io:(FBProcessIO *)io queue:(dispatch_queue_t)queue acceptableStatusCodes:(NSSet<NSNumber *> *)acceptableStatusCodes configurationDescription:(NSString *)configurationDescription programName:(NSString *)programName
+- (instancetype)initWithProcess:(id<FBTaskProcess>)process stdOut:(FBProcessOutput *)stdOut stdErr:(FBProcessOutput *)stdErr stdIn:(FBProcessInput *)stdIn queue:(dispatch_queue_t)queue acceptableStatusCodes:(NSSet<NSNumber *> *)acceptableStatusCodes configurationDescription:(NSString *)configurationDescription
 {
   self = [super init];
   if (!self) {
@@ -257,47 +176,40 @@ static BOOL AddInputFileActions(posix_spawn_file_actions_t *fileActions, FBProce
 
   _process = process;
   _acceptableStatusCodes = acceptableStatusCodes;
-  _io = io;
+  _stdOutSlot = stdOut;
+  _stdErrSlot = stdErr;
+  _stdInSlot = stdIn;
   _queue = queue;
   _configurationDescription = configurationDescription;
-  _programName = programName;
+  _errorFuture = FBMutableFuture.future;
+  _startedTeardownFuture = FBMutableFuture.future;
+  _completedTeardownFuture = FBMutableFuture.future;
 
-  // Do not propogate cancellation of completed to the exit code future.
-  FBMutableFuture<NSNumber *> *shieldedExitCode = FBMutableFuture.future;
-  [shieldedExitCode resolveFromFuture:self.exitCode];
-  _completed = [[[shieldedExitCode
+  _completed = [[[[FBFuture race:@[
+      [FBMutableFuture.future resolveFromFuture:process.exitCode],
+      _errorFuture,
+    ]]
     onQueue:self.queue chain:^ FBFuture<NSNumber *> * (FBFuture<NSNumber *> *future) {
-      // We have a cancellation responder, so de-duplicate the handling of it.
-      if (future.state == FBFutureStateCancelled) {
-        return future;
-      }
-      return [self terminate];
-    }]
-    named:self.configurationDescription]
-    onQueue:self.queue respondToCancellation:^{
-      // Respond to cancellation in the handler, instead of in chain.
-      // This means that the caller can be notified of the full teardown with the value of -[FBFuture cancel]
       return [[self
-        terminate]
-        onQueue:self.queue chain:^(id _) {
-          // Avoid any kind of error in a cancellation handler.
-          return FBFuture.empty;
-        }];
-    }];
-
+        terminateWithErrorMessage:future.error.localizedDescription]
+        fmapReplace:future];
+    }]
+    onQueue:self.queue respondToCancellation:^FBFuture<NSNull *> *{
+      return [self terminateWithErrorMessage:@"Execution was cancelled"];
+    }]
+    named:self.configurationDescription];
 
   return self;
 }
 
 #pragma mark Public Methods
 
-- (FBFuture<NSNumber *> *)sendSignal:(int)signo
+- (FBFuture *)sendSignal:(int)signo
 {
-  return [[FBFuture
+  return [FBFuture
     onQueue:self.queue resolve:^{
       return [self.process sendSignal:signo];
-    }]
-    mapReplace:@(signo)];
+    }];
 }
 
 #pragma mark Accessors
@@ -312,54 +224,115 @@ static BOOL AddInputFileActions(posix_spawn_file_actions_t *fileActions, FBProce
   return self.process.processIdentifier;
 }
 
-- (nullable id)stdIn
-{
-  return [self.io.stdIn contents];
-}
-
 - (nullable id)stdOut
 {
-  return [self.io.stdOut contents];
+  return [self.stdOutSlot contents];
 }
 
 - (nullable id)stdErr
 {
-  return [self.io.stdErr contents];
+  return [self.stdErrSlot contents];
+}
+
+- (nullable id)stdIn
+{
+  return [self.stdInSlot contents];
 }
 
 #pragma mark Private
 
-- (FBFuture<NSNumber *> *)terminate
+- (FBFuture<FBTask *> *)launchTask
 {
-  return [[[self
-    teardownProcess] // Wait for the process to exit, terminating it if necessary.
-    onQueue:self.queue chain:^(FBFuture<NSNumber *> *exitCodeFuture) {
-      // Then tear-down the resources, this should happen regardless of the exit status.
-      return [[self.io detach] fmapReplace:exitCodeFuture];
-    }]
-    onQueue:self.queue fmap:^(NSNumber *exitCode) {
-      // Then check whether the exit code honours the acceptable codes.
-      if (![self.acceptableStatusCodes containsObject:exitCode]) {
-        NSString *message = [NSString stringWithFormat:@"%@ Returned non-zero status code %@", self.programName, exitCode];
-        if ([self.stdErr conformsToProtocol:@protocol(FBAccumulatingBuffer)]) {
-          NSData *outputData = [self.stdErr data];
-          message = [message stringByAppendingFormat:@": %@", [[NSString alloc] initWithData:outputData encoding:NSUTF8StringEncoding]];
-        }
-        return [[[FBControlCoreError
-          describe:message]
-          inDomain:FBTaskErrorDomain]
-          failFuture];
+  return [[FBFuture
+    futureWithFutures:@[
+      [self.stdInSlot attachToPipeOrFileHandle] ?: [FBFuture futureWithResult:NSNull.null],
+      [self.stdOutSlot attachToPipeOrFileHandle] ?: [FBFuture futureWithResult:NSNull.null],
+      [self.stdErrSlot attachToPipeOrFileHandle] ?: [FBFuture futureWithResult:NSNull.null],
+    ]]
+    onQueue:self.queue map:^(NSArray<id> *pipes) {
+      // Mount all the relevant std streams.
+      id stdIn = pipes[0];
+      if ([stdIn isKindOfClass:NSFileHandle.class] || [stdIn isKindOfClass:NSPipe.class]) {
+        [self.process mountStandardIn:stdIn];
       }
-      return [FBFuture futureWithResult:exitCode];
+      id stdOut = pipes[1];
+      if ([stdOut isKindOfClass:NSFileHandle.class] || [stdOut isKindOfClass:NSPipe.class]) {
+        [self.process mountStandardOut:stdOut];
+      }
+      id stdErr = pipes[2];
+      if ([stdErr isKindOfClass:NSFileHandle.class] || [stdErr isKindOfClass:NSPipe.class]) {
+        [self.process mountStandardErr:stdErr];
+      }
+
+      // Everything is setup, launch the process now.
+      [self.process launch];
+
+      return self;
+    }];
+}
+
+- (FBFuture<NSNull *> *)terminateWithErrorMessage:(nullable NSString *)errorMessage
+{
+  if (self.completedTeardownFuture.hasCompleted && !self.startedTeardownFuture.hasCompleted) {
+    return [[FBControlCoreError
+      describeFormat:@"Cannot call %@ as teardown is in progress", NSStringFromSelector(_cmd)]
+      failFuture];
+  }
+  if (errorMessage) {
+    [self.errorFuture resolveWithError:[self errorForMessage:errorMessage]];
+  }
+  if (self.completedTeardownFuture.hasCompleted) {
+    return [FBFuture futureWithResult:NSNull.null];
+  }
+
+  [self.startedTeardownFuture resolveWithResult:NSNull.null];
+  return [[[self
+    teardownProcess]
+    onQueue:self.queue fmap:^(NSNumber *exitCode) {
+      if (![self.acceptableStatusCodes containsObject:exitCode]) {
+        NSError *error = [self errorForMessage:[NSString stringWithFormat:@"Returned non-zero status code %d", self.process.terminationStatus]];
+        [self.errorFuture resolveWithError:error];
+      }
+      return [self teardownResources];
+    }]
+    onQueue:self.queue chain:^(id _) {
+      [self.completedTeardownFuture resolveWithResult:NSNull.null];
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
 - (FBFuture<NSNumber *> *)teardownProcess
 {
-  if (self.process.exitCode.state == FBFutureStateRunning) {
+  if (self.process.isRunning) {
     return [self.process sendSignal:SIGTERM];
   }
   return self.process.exitCode;
+}
+
+- (FBFuture<NSNull *> *)teardownResources
+{
+  return [[FBFuture
+    futureWithFutures:@[
+      [self.stdOutSlot detach] ?: [FBFuture futureWithResult:NSNull.null],
+      [self.stdErrSlot detach] ?: [FBFuture futureWithResult:NSNull.null],
+      [self.stdInSlot detach] ?: [FBFuture futureWithResult:NSNull.null],
+    ]]
+    mapReplace:NSNull.null];
+}
+
+- (NSError *)errorForMessage:(NSString *)errorMessage
+{
+  FBControlCoreError *error = [[[[[FBControlCoreError
+    describe:errorMessage]
+    inDomain:FBTaskErrorDomain]
+    extraInfo:@"stdout" value:self.stdOut]
+    extraInfo:@"stderr" value:self.stdErr]
+    extraInfo:@"pid" value:@(self.processIdentifier)];
+
+  if (self.exitCode.state == FBFutureStateDone) {
+    [error extraInfo:@"exitcode" value:self.exitCode.result];
+  }
+  return [error build];
 }
 
 #pragma mark NSObject

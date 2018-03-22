@@ -1,15 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class FBCrashLogInfo;
+@class FBDiagnostic;
 @class XCTestBootstrapError;
 
 /**
@@ -30,7 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  A Result that represents a Test Bundle crashing during a test run.
  */
-+ (instancetype)bundleCrashedDuringTestRun:(FBCrashLogInfo *)crash;
++ (instancetype)bundleCrashedDuringTestRun:(FBDiagnostic *)diagnostic;
 
 /**
  A Failure Result.
@@ -50,7 +52,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  A Diagnostic for a crash.
  */
-@property (nonatomic, strong, nullable, readonly) FBCrashLogInfo *crash;
+@property (nonatomic, strong, nullable, readonly) FBDiagnostic *diagnostic;
 
 @end
 

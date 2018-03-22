@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorAgentOperation.h"
@@ -17,6 +19,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
 @interface FBSimulatorAgentOperation ()
 
 @property (nonatomic, weak, nullable, readonly) FBSimulator *simulator;
+@property (nonatomic, strong, readonly) FBFuture<FBProcessInfo *> *processInfoFuture;
 
 @end
 
@@ -32,11 +35,15 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
   return [launchFuture
     onQueue:simulator.workQueue map:^(NSNumber *processIdentifierNumber) {
       pid_t processIdentifier = processIdentifierNumber.intValue;
-      return [[self alloc] initWithSimulator:simulator configuration:configuration stdOut:stdOut stdErr:stdErr processIdentifier:processIdentifier processStatusFuture:processStatusFuture];
+      FBFuture<FBProcessInfo *> *processInfoFuture = [[FBProcessFetcher
+        obtainProcessInfoForProcessIdentifierInBackground:processIdentifier timeout:FBControlCoreGlobalConfiguration.fastTimeout]
+        rephraseFailure:@"Could not fetch process info for pid %d with configuration %@", processIdentifier, configuration];
+
+      return [[self alloc] initWithSimulator:simulator configuration:configuration stdOut:stdOut stdErr:stdErr processIdentifier:processIdentifier processInfoFuture:processInfoFuture processStatusFuture:processStatusFuture];
     }];
 }
 
-- (instancetype)initWithSimulator:(FBSimulator *)simulator configuration:(FBAgentLaunchConfiguration *)configuration stdOut:(nullable FBProcessOutput *)stdOut stdErr:(nullable FBProcessOutput *)stdErr processIdentifier:(pid_t)processIdentifier processStatusFuture:(FBFuture<NSNumber *> *)processStatusFuture
+- (instancetype)initWithSimulator:(FBSimulator *)simulator configuration:(FBAgentLaunchConfiguration *)configuration stdOut:(nullable FBProcessOutput *)stdOut stdErr:(nullable FBProcessOutput *)stdErr processIdentifier:(pid_t)processIdentifier processInfoFuture:(FBFuture<FBProcessInfo *> *)processInfoFuture processStatusFuture:(FBFuture<NSNumber *> *)processStatusFuture
 {
   self = [super init];
   if (!self) {
@@ -48,15 +55,14 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
   _stdOut = stdOut;
   _stdErr = stdErr;
   _processIdentifier = processIdentifier;
-  _processStatus = [[processStatusFuture
+  _processStatus = [processStatusFuture
     onQueue:simulator.workQueue chain:^ FBFuture<NSNumber *> * (FBFuture<NSNumber *> *future) {
       FBFuture<NSNull *> *teardown = future.result
         ? [self processDidTerminate:future.result.intValue]
         : [self processWasCancelled];
       return [teardown fmapReplace:future];
-    }]
-    nameFormat:@"Completion of agent process %d", processIdentifier];
-  _exitCode = [[processStatusFuture
+    }];
+  _exitCode = [processStatusFuture
     onQueue:simulator.asyncQueue map:^(NSNumber *statLocNumber) {
       int stat_loc = statLocNumber.intValue;
       if (WIFEXITED(stat_loc)) {
@@ -64,8 +70,8 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
       } else {
         return @(WTERMSIG(stat_loc));
       }
-    }]
-    nameFormat:@"Exit code of agent process %d", processIdentifier];
+    }];
+  _processInfoFuture = processInfoFuture;
 
   return self;
 }
@@ -76,6 +82,13 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
     return WEXITSTATUS(statLoc) == 0;
   }
   return NO;
+}
+
+#pragma mark Public
+
+- (FBProcessInfo *)processInfo
+{
+  return self.processInfoFuture.result;
 }
 
 #pragma mark Private
@@ -92,9 +105,12 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
   FBFuture<NSNull *> *teardown = [self performTeardown];
 
   // When cancelled, the process is may still be alive. Therefore, the process needs to be terminated to fulfill the cancellation contract.
-  [[FBProcessTerminationStrategy
-    strategyWithProcessFetcher:self.simulator.processFetcher.processFetcher workQueue:self.simulator.workQueue logger:self.simulator.logger]
-    killProcessIdentifier:self.processIdentifier];
+  FBProcessInfo *processInfo = self.processInfo;
+  if (processInfo) {
+    [[FBProcessTerminationStrategy
+      strategyWithProcessFetcher:self.simulator.processFetcher.processFetcher workQueue:self.simulator.workQueue logger:self.simulator.logger]
+      killProcess:processInfo];
+  }
 
   return teardown;
 }
@@ -104,8 +120,8 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent = @"agent";
   // Tear down the other resources.
   return [[FBFuture
     futureWithFutures:@[
-      [self.stdOut detach] ?: FBFuture.empty,
-      [self.stdErr detach] ?: FBFuture.empty,
+      [self.stdOut detach] ?: [FBFuture futureWithResult:NSNull.null],
+      [self.stdErr detach] ?: [FBFuture futureWithResult:NSNull.null],
     ]]
     mapReplace:NSNull.null];
 }

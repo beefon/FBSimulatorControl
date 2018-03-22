@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestLogger.h"
@@ -74,7 +76,7 @@ static NSString *const xctoolOutputLogDirectoryEnv = @"XCTOOL_TEST_ENV_FB_LOG_DI
 
   id<FBControlCoreLogger> baseLogger = [FBControlCoreLogger compositeLoggerWithLoggers:@[
     [[FBControlCoreLogger systemLoggerWritingToStderr:YES withDebugLogging:YES] withDateFormatEnabled:YES],
-    [[FBControlCoreLogger loggerToFileDescriptor:fileHandle.fileDescriptor closeOnEndOfFile:NO] withDateFormatEnabled:YES],
+    [[FBControlCoreLogger loggerToFileHandle:fileHandle] withDateFormatEnabled:YES],
   ]];
 
   return [[self alloc] initWithBaseLogger:baseLogger logDirectory:directory];

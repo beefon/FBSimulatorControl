@@ -1,20 +1,16 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBDeviceScreenshotCommands.h"
 
-#import "FBAMDevice+Private.h"
-#import "FBAMDevice.h"
-#import "FBAMDServiceConnection.h"
-#import "FBDevice+Private.h"
 #import "FBDevice.h"
-#import "FBDeviceControlError.h"
-#import "FBDeviceLinkClient.h"
-#import "FBServiceConnectionClient.h"
+#import "FBDLDevice.h"
 
 @interface FBDeviceScreenshotCommands ()
 
@@ -45,29 +41,12 @@
 
 #pragma mark FBScreenshotCommands
 
-static NSString *const ScreenShotDataKey = @"ScreenShotData";
-
 - (FBFuture<NSData *> *)takeScreenshot:(FBScreenshotFormat)format
 {
-  return [[[[[self.device.amDevice
-    startService:@"com.apple.mobile.screenshotr"]
-    onQueue:self.device.workQueue push:^(FBAMDServiceConnection *connection) {
-      return [connection makeClientWithLogger:self.device.logger];
-    }]
-    onQueue:self.device.workQueue pend:^(FBServiceConnectionClient *rawClient) {
-      return [FBDeviceLinkClient deviceLinkClientWithServiceConnectionClient:rawClient];
-    }]
-    onQueue:self.device.workQueue pop:^(FBDeviceLinkClient *client) {
-      return [client processMessage:@{@"MessageType": @"ScreenShotRequest"}];
-    }]
-    onQueue:self.device.asyncQueue fmap:^(NSDictionary<id, id> *response) {
-      NSData *screenshotData = response[ScreenShotDataKey];
-      if (![screenshotData isKindOfClass:NSData.class]) {
-        return [[FBDeviceControlError
-          describeFormat:@"%@ is not an NSData for %@", screenshotData, ScreenShotDataKey]
-          failFuture];
-      }
-      return [FBFuture futureWithResult:screenshotData];
+  return [[FBDLDevice
+    deviceWithUDID:self.device.udid timeout:FBControlCoreGlobalConfiguration.regularTimeout]
+    onQueue:self.device.workQueue fmap:^(FBDLDevice *dlDevice) {
+      return [dlDevice screenshotData];
     }];
 }
 

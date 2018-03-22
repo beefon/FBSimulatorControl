@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXcodeConfiguration.h"
@@ -11,7 +13,7 @@
 
 #import "FBTaskBuilder.h"
 #import "FBXcodeDirectory.h"
-#import "FBFuture+Sync.h"
+#import "NSRunLoop+FBControlCore.h"
 
 @implementation FBXcodeConfiguration
 
@@ -23,11 +25,6 @@
     directory = [self findXcodeDeveloperDirectoryOrAssert];
   });
   return directory;
-}
-
-+ (NSString *)contentsDirectory
-{
-  return [[self developerDirectory] stringByDeletingLastPathComponent];
 }
 
 + (nullable NSString *)appleConfiguratorApplicationPath
@@ -85,6 +82,16 @@
   return formatter;
 }
 
++ (BOOL)isXcode7OrGreater
+{
+  return [FBXcodeConfiguration.xcodeVersionNumber compare:[NSDecimalNumber decimalNumberWithString:@"7.0"]] != NSOrderedAscending;
+}
+
++ (BOOL)isXcode8OrGreater
+{
+  return [FBXcodeConfiguration.xcodeVersionNumber compare:[NSDecimalNumber decimalNumberWithString:@"8.0"]] != NSOrderedAscending;
+}
+
 + (BOOL)isXcode9OrGreater
 {
   return [FBXcodeConfiguration.xcodeVersionNumber compare:[NSDecimalNumber decimalNumberWithString:@"9.0"]] != NSOrderedAscending;
@@ -95,13 +102,22 @@
   return [FBXcodeConfiguration.xcodeVersionNumber compare:[NSDecimalNumber decimalNumberWithString:@"10.0"]] != NSOrderedAscending;
 }
 
++ (BOOL)supportsCustomDeviceSets
+{
+  // Prior to Xcode 7, 'iOS Simulator.app' calls `+[SimDeviceSet defaultSet]` directly
+  // This means that the '-DeviceSetPath' won't do anything for Simulators booted with prior to Xcode 7.
+  // It should be possible to fix this by injecting a shim that swizzles this method in these Xcode versions.
+  return self.isXcode7OrGreater;
+}
+
 + (NSString *)description
 {
   return [NSString stringWithFormat:
-    @"Developer Directory %@ | Xcode Version %@ | iOS SDK Version %@",
+    @"Developer Directory %@ | Xcode Version %@ | iOS SDK Version %@ | Supports Custom Device Sets %d",
     self.developerDirectory,
     self.xcodeVersionNumber,
-    self.iosSDKVersionNumber
+    self.iosSDKVersionNumber,
+    self.supportsCustomDeviceSets
   ];
 }
 

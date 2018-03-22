@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -13,44 +15,25 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef NS_ENUM(NSUInteger, FBProcessStreamAttachmentMode) {
-  FBProcessStreamAttachmentModeInput = 0,
-  FBProcessStreamAttachmentModeOutput = 1,
-};
-
-/**
- An attached standard stream object.
- */
-@interface FBProcessStreamAttachment : NSObject
-
-/**
- The file descriptor to attach to.
- */
-@property (nonatomic, assign, readonly) int fileDescriptor;
-
-/**
- Whether the implementor should close when it reaches the end of it's stream.
- */
-@property (nonatomic, assign, readonly) BOOL closeOnEndOfFile;
-
-/**
- Whether the attachment represents an input or an output.
- */
-@property (nonatomic, assign, readonly) FBProcessStreamAttachmentMode mode;
-
-@end
-
 /**
  A Protocol that wraps the standard stream stdout, stderr, stdin
  */
 @protocol FBStandardStream <NSObject>
 
 /**
- Attaches to the output, returning an FBProcessStreamAttachment.
+ Attaches to the output, returning a NSFileHandle for writing to.
 
- @return A Future wrapping the FBProcessStreamAttachment.
+ @return A Future wrapping the File Handle.
  */
-- (FBFuture<FBProcessStreamAttachment *> *)attach;
+- (FBFuture<NSFileHandle *> *)attachToFileHandle;
+
+/**
+ Attaches to the output, returning a NSPipe or NSFileHandle for writing to.
+ This method will prefer returning a NSPipe since this is more affordant for the NSTask API.
+
+ @return A Future wrapping the Pipe or File Handle.
+ */
+- (FBFuture<id> *)attachToPipeOrFileHandle;
 
 /**
  Tears down the output.
@@ -58,23 +41,6 @@ typedef NS_ENUM(NSUInteger, FBProcessStreamAttachmentMode) {
  @return A Future that resolves when teardown has completed.
  */
 - (FBFuture<NSNull *> *)detach;
-
-@end
-
-/**
- Provides information about the state of a stream
- */
-@protocol FBStandardStreamTransfer <NSObject>
-
-/**
- The number of bytes transferred.
- */
-@property (nonatomic, assign, readonly) ssize_t bytesTransferred;
-
-/**
- An error, if any has occured in the streaming of data to the input.
- */
-@property (nonatomic, strong, nullable, readonly) NSError *streamError;
 
 @end
 
@@ -101,28 +67,6 @@ typedef NS_ENUM(NSUInteger, FBProcessStreamAttachmentMode) {
 @end
 
 /**
- Process Output that can be provided through a file.
- */
-@protocol FBProcessOutput <NSObject>
-
-/**
- Allows the reciever to be written to via a file instead of via a file handle.
- This is desirable to use when interacting with an API that doesn't support writing to a file handle.
-
- @return A Future wrapping a FBProcessFileOutput instance.
- */
-- (FBFuture<id<FBProcessFileOutput>> *)providedThroughFile;
-
-/**
- Allows the reciever to be written to via a Data Consumer.
-
- @return A Future wrapping a FBDataConsumer instance.
- */
-- (FBFuture<id<FBDataConsumer>> *)providedThroughConsumer;
-
-@end
-
-/**
  The Termination Handle Type for Process Output.
  */
 extern FBiOSTargetFutureType const FBiOSTargetFutureTypeProcessOutput;
@@ -130,7 +74,7 @@ extern FBiOSTargetFutureType const FBiOSTargetFutureTypeProcessOutput;
 /**
  A container object for the output of a process.
  */
-@interface FBProcessOutput<WrappedType> : NSObject <FBStandardStream, FBProcessOutput>
+@interface FBProcessOutput<WrappedType> : NSObject <FBStandardStream>
 
 #pragma mark Initializers
 
@@ -144,26 +88,19 @@ extern FBiOSTargetFutureType const FBiOSTargetFutureTypeProcessOutput;
 /**
  An Output Container for a File Path.
 
- @param filePath the File Path to write to, may not be nil.
+ @param filePath the File Path to write to.
  @return a Process Output instance.
  */
 + (FBProcessOutput<NSString *> *)outputForFilePath:(NSString *)filePath;
 
 /**
- An Output Container for an Input Stream
-
- @return a Process Output instance.
- */
-+ (FBProcessOutput<NSInputStream *> *)outputToInputStream;
-
-/**
- An Output Container that passes to both a data consumer and a logger.
+ An Output Container that passes to Data Consumer.
 
  @param dataConsumer the file consumer to write to.
  @param logger the logger to log to.
  @return a Process Output instance.
  */
-+ (FBProcessOutput<id<FBDataConsumer>> *)outputForDataConsumer:(id<FBDataConsumer>)dataConsumer logger:(id<FBControlCoreLogger>)logger;
++ (FBProcessOutput<id<FBDataConsumer>> *)outputForDataConsumer:(id<FBDataConsumer>)dataConsumer logger:(nullable id<FBControlCoreLogger>)logger;
 
 /**
  An Output Container that passes to Data Consumer.
@@ -200,9 +137,19 @@ extern FBiOSTargetFutureType const FBiOSTargetFutureTypeProcessOutput;
 #pragma mark Properties
 
 /**
- The wrapped contents of the stream.
+ The File Handle.
  */
 @property (nonatomic, strong, readonly) WrappedType contents;
+
+#pragma mark Public Methods
+
+/**
+ Allows the reciever to be written to via a file instead of via a file handle.
+ This is desirable to use when interacting with an API that doesn't support writing to a file handle.
+
+ @return A Future wrapping a FBProcessFileOutput instance.
+ */
+- (FBFuture<id<FBProcessFileOutput>> *)providedThroughFile;
 
 @end
 
@@ -214,20 +161,12 @@ extern FBiOSTargetFutureType const FBiOSTargetFutureTypeProcessOutput;
 #pragma mark Initializers
 
 /**
- An input container that provides a data consumer.
- The 'contents' field will contain an opaque consumer that can be written to externally.
+ An Output Container that connects a File Consumer to a Pipe.
+ The 'contents' field will contain an opaque consumer that can be written to.
 
- @return a FBProcessInput instance wrapping a data consumer.
+ @return a Process Output instance.
  */
-+ (FBProcessInput<id<FBDataConsumer>> *)inputFromConsumer;
-
-/**
- An input container that provides an NSOutputStream.
- The 'contents' field will contain an NSOutputStream that can be written to.
-
- @return a FBProcessInput instance wrapping an NSOutputStream.
- */
-+ (FBProcessInput<NSOutputStream *> *)inputFromStream;
++ (FBProcessInput<id<FBDataConsumer>> *)inputProducingConsumer;
 
 /**
  An Input container that connects data to the iput.
@@ -240,7 +179,7 @@ extern FBiOSTargetFutureType const FBiOSTargetFutureTypeProcessOutput;
 #pragma mark Properties
 
 /**
- The wrapped contents of the stream.
+ The File Handle.
  */
 @property (nonatomic, strong, readonly) WrappedType contents;
 

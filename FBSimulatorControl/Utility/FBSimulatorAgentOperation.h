@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -55,6 +57,12 @@ extern FBiOSTargetFutureType const FBiOSTargetFutureTypeSimulatorAgent;
  The stderr File Handle.
  */
 @property (nonatomic, strong, nullable, readonly) FBProcessOutput *stdErr;
+
+/**
+ The Process Info of the launched process.
+ This may be nil in the event that the process was short lived and the process info could not be obtained.
+ */
+@property (nonatomic, copy, nullable, readonly) FBProcessInfo *processInfo;
 
 /**
  A Future representation of the completion of the agent process.

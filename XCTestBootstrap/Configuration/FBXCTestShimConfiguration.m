@@ -1,15 +1,16 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestShimConfiguration.h"
 
 #import <FBControlCore/FBControlCore.h>
-
-#import "XCTestBootstrapError.h"
+#import <XCTestBootstrap/XCTestBootstrap.h>
 
 NSString *const FBXCTestShimDirectoryEnvironmentOverride = @"TEST_SHIMS_DIRECTORY";
 
@@ -41,7 +42,7 @@ static NSString *const maculatorShimFileName = @"libMaculator.dylib";
 + (NSDictionary<NSString *, NSNumber *> *)canonicalShimNameToCodesigningRequired
 {
   return @{
-    KeySimulatorTestShim: @(FBControlCoreGlobalConfiguration.confirmCodesignaturesAreValid),
+    KeySimulatorTestShim: @(FBControlCoreGlobalConfiguration.confirmCodesignaturesAreValid && FBXcodeConfiguration.isXcode8OrGreater),
     KeyMacQueryShim: @NO,
     KeyMacTestShim: @NO,
   };
@@ -55,9 +56,8 @@ static NSString *const maculatorShimFileName = @"libMaculator.dylib";
 
   NSString *shimPath = [directory stringByAppendingPathComponent:filename];
   if (![NSFileManager.defaultManager fileExistsAtPath:shimPath]) {
-    return [[[FBControlCoreError
-      describeFormat:@"No shim located at expected location of %@", shimPath]
-      noLogging]
+    return [[FBControlCoreError
+      describeFormat:@"No shim located at expectect location of %@", shimPath]
       failFuture];
   }
   if (!signingRequired) {
@@ -79,7 +79,6 @@ static NSString *const maculatorShimFileName = @"libMaculator.dylib";
         [searchPaths addObject:environmentDefinedDirectory];
       }
       [searchPaths addObject:[self.fbxctestInstallationRoot stringByAppendingPathComponent:@"lib"]];
-      [searchPaths addObject:[self.fbxctestInstallationRoot stringByAppendingPathComponent:@"bin"]];
       [searchPaths addObject:[NSBundle bundleForClass:self].resourcePath];
 
       NSMutableArray<FBFuture<NSString *> *> *futures = NSMutableArray.array;

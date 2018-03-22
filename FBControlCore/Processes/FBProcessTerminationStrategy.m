@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBProcessTerminationStrategy.h"
@@ -17,8 +19,6 @@
 #import "FBControlCoreError+Process.h"
 #import "FBControlCoreLogger.h"
 #import "FBControlCoreGlobalConfiguration.h"
-
-static NSTimeInterval ProcessTableRemovalTimeout = 20.0;
 
 static const FBProcessTerminationStrategyConfiguration FBProcessTerminationStrategyConfigurationDefault = {
   .signo = SIGKILL,
@@ -55,22 +55,22 @@ static const FBProcessTerminationStrategyConfiguration FBProcessTerminationStrat
   // Terminate and return if successful.
   if ([application terminate]) {
     [self.logger.debug logFormat:@"Terminated %@ with Application Termination", process.shortDescription];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
   // If the App is already terminated, everything is ok.
   if (application.isTerminated) {
     [self.logger.debug logFormat:@"Application %@ is Terminated", process.shortDescription];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
   // I find your lack of termination disturbing.
   if ([application forceTerminate]) {
     [self.logger.debug logFormat:@"Terminated %@ with Forced Application Termination", process.shortDescription];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
   // If the App is already terminated, everything is ok.
   if (application.isTerminated) {
     [self.logger.debug logFormat:@"Application %@ terminated after Forced Application Termination", process.shortDescription];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
   return [[[[FBControlCoreError
     describeFormat:@"Could not terminate Application %@", application]
@@ -118,50 +118,71 @@ static const FBProcessTerminationStrategyConfiguration FBProcessTerminationStrat
 
 #pragma mark Public Methods
 
-- (FBFuture<NSNull *> *)killProcessIdentifier:(pid_t)processIdentifier
+- (FBFuture<NSNull *> *)killProcess:(FBProcessInfo *)process
 {
   BOOL checkExists = (self.configuration.options & FBProcessTerminationStrategyOptionsCheckProcessExistsBeforeSignal) == FBProcessTerminationStrategyOptionsCheckProcessExistsBeforeSignal;
   NSError *innerError = nil;
-  if (checkExists && ![self.processFetcher processIdentifierExists:processIdentifier error:&innerError]) {
+  if (checkExists && ![self.processFetcher processExists:process error:&innerError]) {
     return [[[[FBControlCoreError
-      describeFormat:@"Could not find that process %d exists", processIdentifier]
+      describeFormat:@"Could not find that process %@ exists", process]
       logger:self.logger]
       causedBy:innerError]
       failFuture];
   }
 
   // Kill the process with kill(2).
-  [self.logger.debug logFormat:@"Killing %d", processIdentifier];
-  if (kill(processIdentifier, self.configuration.signo) != 0) {
+  [self.logger.debug logFormat:@"Killing %@", process.shortDescription];
+  if (kill(process.processIdentifier, self.configuration.signo) != 0) {
+    // If the kill failed, then extract the error information and return.
+    int errorCode = errno;
+    if (errorCode == EPERM) {
+      return [[[[FBControlCoreError
+        describeFormat:@"Failed to kill process %@ as the sending process does not have the privelages", process.shortDescription]
+        attachProcessInfoForIdentifier:process.processIdentifier processFetcher:self.processFetcher]
+        logger:self.logger]
+        failFuture];
+    }
+    if (errorCode == ESRCH) {
+      return [[[[FBControlCoreError
+        describeFormat:@"Failed to kill process %@ as the sending process does not exist", process.shortDescription]
+        attachProcessInfoForIdentifier:process.processIdentifier processFetcher:self.processFetcher]
+        logger:self.logger]
+        failFuture];
+    }
+    if (errorCode == EINVAL) {
+      return [[[[FBControlCoreError
+        describeFormat:@"Failed to kill process %@ as the signal %d was not a valid signal number", process.shortDescription, self.configuration.signo]
+        attachProcessInfoForIdentifier:process.processIdentifier processFetcher:self.processFetcher]
+        logger:self.logger]
+        failFuture];
+    }
     return [[FBControlCoreError
-      describeFormat:@"Failed to kill %d: '%s'", processIdentifier, strerror(errno)]
+      describeFormat:@"Failed to kill process %@ with error '%s'", process.shortDescription, strerror(errorCode)]
       failFuture];
   }
 
   BOOL checkDeath = (self.configuration.options & FBProcessTerminationStrategyOptionsCheckDeathAfterSignal) == FBProcessTerminationStrategyOptionsCheckDeathAfterSignal;
   if (!checkDeath) {
-    [self.logger.debug logFormat:@"Killed %d", processIdentifier];
-    return FBFuture.empty;
+    [self.logger.debug logFormat:@"Killed %@", process.shortDescription];
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
   // It may take some time for the process to have truly died, so wait for it to be so.
   // If this is a SIGKILL and it's taken a while for the process to dissapear, perhaps the process isn't
   // well behaved when responding to other terminating signals.
   // There's nothing more than can be done with a SIGKILL.
-  [self.logger.debug logFormat:@"Waiting on %d to dissappear from the process table", processIdentifier];
-  return [[[self.processFetcher
-    onQueue:self.workQueue waitForProcessIdentifierToDie:processIdentifier]
-    timeout:ProcessTableRemovalTimeout waitingFor:@"Process %d to be removed from the process table", processIdentifier]
+  [self.logger.debug logFormat:@"Waiting on %@ to dissappear from the process table", process.shortDescription];
+  return [[self.processFetcher
+    onQueue:self.workQueue waitForProcessToDie:process]
     onQueue:self.workQueue chain:^FBFuture *(FBFuture *future) {
       if (future.result) {
-        [self.logger.debug logFormat:@"Process %d terminated", processIdentifier];
-        return FBFuture.empty;
+        return [FBFuture futureWithResult:NSNull.null];
       }
       BOOL backoff = (self.configuration.options & FBProcessTerminationStrategyOptionsBackoffToSIGKILL) == FBProcessTerminationStrategyOptionsBackoffToSIGKILL;
       if (self.configuration.signo == SIGKILL || !backoff) {
         return [[[[FBControlCoreError
-          describeFormat:@"Timed out waiting for %d to dissapear from the process table", processIdentifier]
-          attachProcessInfoForIdentifier:processIdentifier processFetcher:self.processFetcher]
+          describeFormat:@"Timed out waiting for %@ to dissapear from the process table", process.shortDescription]
+          attachProcessInfoForIdentifier:process.processIdentifier processFetcher:self.processFetcher]
           logger:self.logger]
           failFuture];
       }
@@ -169,17 +190,12 @@ static const FBProcessTerminationStrategyConfiguration FBProcessTerminationStrat
       // Try with SIGKILL instead.
       FBProcessTerminationStrategyConfiguration configuration = self.configuration;
       configuration.signo = SIGKILL;
-      [self.logger.debug logFormat:@"Backing off kill of %d to SIGKILL", processIdentifier];
+      [self.logger.debug logFormat:@"Backing off kill of %@ to SIGKILL", process.shortDescription];
       return [[[self
         strategyWithConfiguration:configuration]
-        killProcessIdentifier:processIdentifier]
-        rephraseFailure:@"Attempted to SIGKILL %d after failed kill with signo %d", processIdentifier, self.configuration.signo];
+        killProcess:process]
+        rephraseFailure:@"Attempted to SIGKILL %@ after failed kill with signo %d", process.shortDescription, self.configuration.signo];
     }];
-}
-
-- (FBFuture<NSNull *> *)killProcess:(FBProcessInfo *)process
-{
-  return [self killProcessIdentifier:process.processIdentifier];
 }
 
 - (FBFuture<NSNull *> *)killProcesses:(NSArray<FBProcessInfo *> *)processes

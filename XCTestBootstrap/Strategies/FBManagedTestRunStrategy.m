@@ -1,16 +1,16 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBManagedTestRunStrategy.h"
 
-#import "FBTestManager.h"
-#import "FBXCTestRunStrategy.h"
-#import "XCTestBootstrapError.h"
-#import "XCTestBootstrapFrameworkLoader.h"
+#import <FBControlCore/FBControlCore.h>
+#import <XCTestBootstrap/XCTestBootstrap.h>
 
 @interface FBManagedTestRunStrategy ()
 
@@ -68,15 +68,26 @@
     reporter:self.reporter
     logger:self.logger];
 
-  return [[testRunStrategy
+  FBFuture<FBTestManager *> *runFuture = [[testRunStrategy
     startTestManagerWithApplicationLaunchConfiguration:self.configuration.applicationLaunchConfiguration]
     onQueue:self.target.workQueue fmap:^(FBTestManager *testManager) {
       FBFuture<FBTestManagerResult *> *result = [testManager execute];
+      [result onQueue:dispatch_get_main_queue()
+   notifyOfCompletion:^(FBFuture<FBTestManagerResult *> * _Nonnull finishedResult) {
+     if (!finishedResult.result.didEndSuccessfully) {
+       [self.logger.error logFormat:@"Test plan did not finish successfully: %@", finishedResult];
+       [self.reporter testManagerMediator:nil
+               testPlanDidFailWithMessage:
+        [NSString stringWithFormat:@"Test plan did not finish successfully: %@", finishedResult]];
+     }
+        
+      }];
       if (result.error) {
         return [FBFuture futureWithError:result.error];
       }
       return [FBFuture futureWithResult:testManager];
     }];
+  return runFuture;
 }
 
 @end

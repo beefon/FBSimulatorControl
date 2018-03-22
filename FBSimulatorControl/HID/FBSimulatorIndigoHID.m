@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorIndigoHID.h"
@@ -213,9 +215,9 @@ IndigoMessage *(*IndigoHIDMessageForMouseNSEvent)(CGPoint *point0, CGPoint *poin
 
 #pragma mark Event Generation
 
-+ (IndigoMessage *)keyboardMessageWithDirection:(FBSimulatorHIDDirection)direction keyCode:(int)keycode messageSizeOut:(size_t *)messageSizeOut
++ (IndigoMessage *)keyboardMessageWithDirection:(FBSimulatorHIDDirection)direction keyCode:(unsigned int)keycode messageSizeOut:(size_t *)messageSizeOut
 {
-  IndigoMessage *message = IndigoHIDMessageForKeyboardArbitrary((int) keycode, direction);
+  IndigoMessage *message = IndigoHIDMessageForKeyboardArbitrary((int) keycode, (int)direction);
   if (messageSizeOut) {
     *messageSizeOut = malloc_size(message);
   }
@@ -224,7 +226,7 @@ IndigoMessage *(*IndigoHIDMessageForMouseNSEvent)(CGPoint *point0, CGPoint *poin
 
 + (IndigoMessage *)buttonMessageWithDirection:(FBSimulatorHIDDirection)direction button:(FBSimulatorHIDButton)button messageSizeOut:(size_t *)messageSizeOut
 {
-  IndigoMessage *message = IndigoHIDMessageForButton((int) [self eventSourceForButton:button], direction, ButtonEventTargetHardware);
+  IndigoMessage *message = IndigoHIDMessageForButton((int) [self eventSourceForButton:button], (int)direction, ButtonEventTargetHardware);
   if (messageSizeOut) {
     *messageSizeOut = malloc_size(message);
   }

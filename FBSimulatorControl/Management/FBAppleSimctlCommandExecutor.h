@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -12,7 +14,6 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class FBSimulator;
-@class FBSimulatorSet;
 
 @protocol FBControlCoreLogger;
 @protocol FBDataConsumer;
@@ -25,20 +26,12 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark Initializers
 
 /**
- Constructs an Executor for a given simulator.
+ Constructs an Executor.
 
  @param simulator the simulator to execute on
  @return a new command executor
  */
 + (instancetype)executorForSimulator:(FBSimulator *)simulator;
-
-/**
- Constructs an Executor for a given simulator set.
-
- @param set the simulator to execute against.
- @return a new command executor
- */
-+ (instancetype)executorForDeviceSet:(FBSimulatorSet *)set;
 
 #pragma mark Public Methods
 

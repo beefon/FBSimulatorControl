@@ -1,14 +1,15 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBAMDServiceConnection.h"
 
 #import "FBDeviceControlError.h"
-#import "FBServiceConnectionClient.h"
 
 @implementation FBAMDServiceConnection
 
@@ -61,9 +62,8 @@
   [self.logger logFormat:@"Invalidating Connection %@", connectionDescription];
   int status = self.calls.ServiceConnectionInvalidate(self.connection);
   if (status != 0) {
-    NSString *errorDescription = CFBridgingRelease(self.calls.CopyErrorText(status));
     return [[FBDeviceControlError
-      describeFormat:@"Failed to invalidate connection %@ with error %@", connectionDescription, errorDescription]
+      describeFormat:@"Failed to invalidate connection %@ with error %d", connectionDescription, status]
       failBool:error];
   }
   [self.logger logFormat:@"Invalidated connection %@", connectionDescription];
@@ -71,11 +71,6 @@
   CFRelease(_connection);
   _connection = NULL;
   return YES;
-}
-
-- (FBFutureContext<FBServiceConnectionClient *> *)makeClientWithLogger:(id<FBControlCoreLogger>)logger
-{
-  return [FBServiceConnectionClient clientForServiceConnection:self logger:logger];
 }
 
 #pragma mark Properties

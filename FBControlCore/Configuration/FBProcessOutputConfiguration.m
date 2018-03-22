@@ -1,17 +1,19 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBProcessOutputConfiguration.h"
 
+#import <FBControlCore/FBControlCore.h>
+
 NSString *const FBProcessOutputToFileDefaultLocation = @"FBProcessOutputToFileDefaultLocation";
 
 @implementation FBProcessOutputConfiguration
-
-#pragma mark Initializers
 
 + (nullable instancetype)configurationWithStdOut:(id)stdOut stdErr:(id)stdErr error:(NSError **)error
 {
@@ -66,20 +68,6 @@ NSString *const FBProcessOutputToFileDefaultLocation = @"FBProcessOutputToFileDe
   return [FBProcessOutputConfiguration configurationWithStdOut:self.stdOut stdErr:stdErr error:error];
 }
 
-#pragma mark Public Methods
-
-- (FBFuture<FBProcessIO *> *)createIOForTarget:(id<FBiOSTarget>)target
-{
-  return [[FBFuture
-    futureWithFutures:@[
-      [self createOutputForTarget:target selector:@selector(stdOut)],
-      [self createOutputForTarget:target selector:@selector(stdErr)],
-    ]]
-    onQueue:target.asyncQueue map:^(NSArray<FBProcessOutput *> *outputs) {
-      return [[FBProcessIO alloc] initWithStdIn:nil stdOut:outputs[0] stdErr:outputs[1]];
-    }];
-}
-
 #pragma mark NSCopying
 
 - (instancetype)copyWithZone:(NSZone *)zone
@@ -129,32 +117,5 @@ static NSString *StdErrKey = @"stderr";
     @"stderr": self.stdErr,
   };
 }
-
-#pragma mark Private
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-
-- (FBFuture<FBProcessOutput *> *)createOutputForTarget:(id<FBiOSTarget>)target selector:(SEL)selector
-{
-  id output = [self performSelector:selector];
-  if ([output isKindOfClass:NSString.class]) {
-    NSString *path = output;
-      if (![NSFileManager.defaultManager createFileAtPath:path contents:NSData.data attributes:nil]) {
-        return [[FBControlCoreError
-          describeFormat:@"Could not create '%@' at path '%@' for config '%@'", NSStringFromSelector(selector), path, self]
-          failFuture];
-      }
-      return [FBFuture futureWithResult:[FBProcessOutput outputForFilePath:path]];
-  }
-  id<FBDataConsumer> consumer = [self performSelector:selector];
-  if ([consumer conformsToProtocol:@protocol(FBDataConsumer)]) {
-    return [FBFuture futureWithResult:[FBProcessOutput outputForDataConsumer:consumer]];
-
-  }
-  return [FBFuture futureWithResult:FBProcessOutput.outputForNullDevice];
-}
-
-#pragma clang diagnostic pop
 
 @end

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestKitFixtures.h"
@@ -45,7 +47,7 @@
   NSDictionary<NSString *, NSString *> *processEnvironment = @{@"FOO" : @"BAR"};
   NSArray<NSString *> *arguments = @[ @"run-tests", @"-sdk", @"iphonesimulator", @"-destination", @"name=iPhone 6", @"-logicTest", testBundlePath ];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory error:&error];
+  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
 
@@ -64,9 +66,11 @@
       testBundlePath:self.iOSUnitTestBundlePath
       waitForDebugger:NO
       timeout:0
-      testFilter:nil
+      testFilters:nil
       mirroring:FBLogicTestMirrorFileLogs]
-    destination:[[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:FBDeviceModeliPhone6 version:nil]];
+    destination:[[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:FBDeviceModeliPhone6 version:nil]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 }
 
@@ -83,7 +87,7 @@
   NSDictionary<NSString *, NSString *> *processEnvironment = @{@"FOO" : @"BAR"};
   NSArray<NSString *> *arguments = @[ @"run-tests", @"-destination", @"name=iPhone 6", @"-logicTest", testBundlePath ];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory error:&error];
+  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
   FBXCTestConfiguration *configuration = commandLine.configuration;
@@ -103,9 +107,11 @@
       testBundlePath:self.iOSUnitTestBundlePath
       waitForDebugger:NO
       timeout:0
-      testFilter:nil
+      testFilters:nil
       mirroring:FBLogicTestMirrorFileLogs]
-    destination:[[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:FBDeviceModeliPhone6 version:nil]];
+    destination:[[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:FBDeviceModeliPhone6 version:nil]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 
 }
@@ -123,7 +129,7 @@
   NSDictionary<NSString *, NSString *> *processEnvironment = @{@"FOO" : @"BAR"};
   NSArray<NSString *> *arguments = @[ @"run-tests", @"-sdk", @"iphonesimulator", @"-logicTest", testBundlePath ];
 
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory error:&error];
+  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
   FBXCTestConfiguration *configuration = commandLine.configuration;
@@ -144,9 +150,11 @@
       testBundlePath:self.iOSUnitTestBundlePath
       waitForDebugger:NO
       timeout:0
-      testFilter:nil
+      testFilters:nil
       mirroring:FBLogicTestMirrorFileLogs]
-    destination:[[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:nil version:nil]];
+    destination:[[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:nil version:nil]
+    simulatorConfigurators:@[]
+    simulatorManagementOptions:0];
   XCTAssertEqualObjects(commandLine, expected);
 }
 

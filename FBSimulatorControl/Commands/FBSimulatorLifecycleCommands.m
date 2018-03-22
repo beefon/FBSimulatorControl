@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorLifecycleCommands.h"
@@ -22,6 +24,7 @@
 #import "FBSimulatorError.h"
 #import "FBSimulatorMutableState.h"
 #import "FBSimulatorEventSink.h"
+#import "FBSimulatorPool.h"
 #import "FBSimulatorSubprocessTerminationStrategy.h"
 #import "FBSimulatorTerminationStrategy.h"
 
@@ -73,6 +76,21 @@
 
 #pragma mark Erase
 
+- (FBFuture<NSNull *> *)freeFromPool
+{
+  if (!self.simulator.pool) {
+    return [[FBSimulatorError
+      describe:@"Cannot free from pool as there is no pool associated"]
+      failFuture];
+  }
+  if (!self.simulator.isAllocated) {
+    return [[FBSimulatorError
+      describe:@"Cannot free from pool as this Simulator has not been allocated"]
+      failFuture];
+  }
+  return [self.simulator.pool freeSimulator:self.simulator];
+}
+
 - (FBFuture<NSNull *> *)erase
 {
   return [[self.simulator.set eraseSimulator:self.simulator] mapReplace:NSNull.null];
@@ -90,19 +108,16 @@
 
 #pragma mark Focus
 
-- (FBFuture<NSNull *> *)focus
+- (BOOL)focusWithError:(NSError **)error
 {
   NSArray *apps = NSWorkspace.sharedWorkspace.runningApplications;
   NSPredicate *matchingPid = [NSPredicate predicateWithFormat:@"processIdentifier = %@", @(self.simulator.containerApplication.processIdentifier)];
   NSRunningApplication *app = [apps filteredArrayUsingPredicate:matchingPid].firstObject;
   if (!app) {
-    return [[FBSimulatorError describeFormat:@"Simulator application for %@ is not running", self.simulator.udid] failFuture];
+    return [[FBSimulatorError describeFormat:@"Simulator application for %@ is not running", self.simulator.udid] failBool:error];
   }
-  if ([app activateWithOptions:NSApplicationActivateIgnoringOtherApps]) {
-    return FBFuture.empty;
-  } {
-    return [FBFuture futureWithError:[FBSimulatorError errorForDescription:@"Failed to focus"]];
-  }
+
+  return [app activateWithOptions:NSApplicationActivateIgnoringOtherApps];
 }
 
 #pragma mark Connection
@@ -137,7 +152,7 @@
   FBSimulatorConnection *connection = self.connection;
   if (!connection) {
     [logger.debug logFormat:@"Simulator %@ does not have an active connection", simulator.shortDescription];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
   NSDate *date = NSDate.date;
@@ -176,17 +191,17 @@
 
 #pragma mark URLs
 
-- (FBFuture<NSNull *> *)openURL:(NSURL *)url
+- (BOOL)openURL:(NSURL *)url error:(NSError **)error
 {
   NSParameterAssert(url);
-  NSError *error = nil;
-  if (![self.simulator.device openURL:url error:&error]) {
+  NSError *innerError = nil;
+  if (![self.simulator.device openURL:url error:&innerError]) {
     return [[[FBSimulatorError
       describeFormat:@"Failed to open URL %@ on simulator %@", url, self.simulator]
-      causedBy:error]
-      failFuture];
+      causedBy:innerError]
+      failBool:error];
   }
-  return [FBFuture futureWithResult:[NSNull null]];
+  return YES;
 }
 
 @end

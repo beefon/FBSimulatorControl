@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBMacDevice.h"
@@ -74,6 +76,7 @@
     _bundleIDToProductMap = [FBMacDevice fetchInstalledApplications];
     _bundleIDToRunningTask = @{}.mutableCopy;
     _launchdProcess = [[FBProcessInfo alloc] initWithProcessIdentifier:1 launchPath:@"/sbin/launchd" arguments:@[] environment:@{}];
+    _requiresTestDaemonMediationForTestHostConnection = YES;
     _shortDescription = _name = @"Local MacOSX host";
     _udid = [FBMacDevice resolveDeviceUDID];
     _state = FBiOSTargetStateBooted;
@@ -91,6 +94,11 @@
   if (self) {
     _logger = logger;
   }
+  return self;
+}
+
+- (id<FBDeviceOperator>)deviceOperator
+{
   return self;
 }
 
@@ -137,11 +145,13 @@
   return (NSString *)CFBridgingRelease(serialNumberAsCFString);
 }
 
+
+#pragma mark - FBDeviceOperator
+@synthesize requiresTestDaemonMediationForTestHostConnection = _requiresTestDaemonMediationForTestHostConnection;
 @synthesize udid = _udid;
 
-- (FBFutureContext<NSNumber *> *)transportForTestManagerService
+- (FBFuture<DTXTransport *> *)makeTransportForTestManagerServiceWithLogger:(id<FBControlCoreLogger>)logger
 {
-  id<FBControlCoreLogger> logger = self.logger;
   NSXPCConnection *connection = [[NSXPCConnection alloc] initWithMachServiceName:@"com.apple.testmanagerd.control" options:0];
   NSXPCInterface *interface = [NSXPCInterface interfaceWithProtocol:@protocol(XCTestManager_XPCControl)];
   [connection setRemoteObjectInterface:interface];
@@ -165,22 +175,22 @@
 
   self.connection = connection;
   __block NSError *error;
-  __block NSFileHandle *transport;
+  __block DTXSocketTransport *transport;
   [proxy _XCT_requestConnectedSocketForTransport:^(NSFileHandle *file, NSError *xctError) {
     if (!file) {
       [logger logFormat:@"Error requesting connection with test manager daemon: %@", xctError.description];
       error = xctError;
       return;
     }
-    transport = file;
+    transport = [[objc_lookUpClass("DTXSocketTransport") alloc] initWithConnectedSocket:file.fileDescriptor disconnectAction:^{
+      [logger log:@"Disconnected from test manager daemon socket"];
+      [file closeFile];
+    }];
   }];
   if (!transport) {
-    return [FBFutureContext futureContextWithError:error];
+    return [FBFuture futureWithError:error];
   }
-  return [[FBFuture futureWithResult:transport] onQueue:self.workQueue contextualTeardown:^(id _, FBFutureState __) {
-    [transport closeFile];
-    return FBFuture.empty;
-  }];
+  return [FBFuture futureWithResult:transport];
 }
 
 - (nonnull FBFuture<NSNumber *> *)processIDWithBundleID:(nonnull NSString *)bundleID
@@ -224,7 +234,6 @@
 
 + (nonnull instancetype)commandsWithTarget:(nonnull id<FBiOSTarget>)target
 {
-  NSAssert(nil, @"commandsWithTarget is not yet supported");
   return nil;
 }
 
@@ -279,7 +288,7 @@
   for (NSString *bundleID in self.bundleIDToProductMap) {
     FBProductBundle *productBundle = self.bundleIDToProductMap[bundleID];
     NSError *error;
-    FBBundleDescriptor *bundle = [FBBundleDescriptor bundleFromPath:productBundle.path error:&error];
+    FBApplicationBundle *bundle = [FBApplicationBundle applicationWithPath:productBundle.path error:&error];
     if (!bundle) {
       return [FBFuture futureWithError:error];
     }
@@ -292,7 +301,7 @@
 {
   FBProductBundle *productBundle = self.bundleIDToProductMap[bundleID];
   NSError *error;
-  FBBundleDescriptor *bundle = [FBBundleDescriptor bundleFromPath:productBundle.path error:&error];
+  FBApplicationBundle *bundle = [FBApplicationBundle applicationWithPath:productBundle.path error:&error];
   if (!bundle) {
     return [FBFuture futureWithError:error];
   }
@@ -429,18 +438,6 @@
 }
 
 - (FBFuture<NSArray<FBCrashLogInfo *> *> *)pruneCrashes:(NSPredicate *)predicate
-{
-  NSAssert(NO, @"-[%@ %@] is not yet supported", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
-  return nil;
-}
-
-- (FBFuture<FBInstrumentsOperation *> *)startInstrument:(FBInstrumentsConfiguration *)configuration logger:(id<FBControlCoreLogger>)logger
-{
-  NSAssert(NO, @"-[%@ %@] is not yet supported", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
-  return nil;
-}
-
-- (FBFuture<id<FBDebugServer>> *)launchDebugServerForHostApplication:(nonnull FBBundleDescriptor *)application port:(in_port_t)port
 {
   NSAssert(NO, @"-[%@ %@] is not yet supported", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
   return nil;

@@ -1,14 +1,16 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <FBSimulatorControl/FBAccessibilityFetch.h>
 #import <FBSimulatorControl/FBAgentLaunchConfiguration+Simulator.h>
 #import <FBSimulatorControl/FBAgentLaunchStrategy.h>
-#import <FBSimulatorControl/FBBundleDescriptor+Simulator.h>
+#import <FBSimulatorControl/FBApplicationBundle+Simulator.h>
 #import <FBSimulatorControl/FBApplicationLaunchStrategy.h>
 #import <FBSimulatorControl/FBCompositeSimulatorEventSink.h>
 #import <FBSimulatorControl/FBContactsUpdateConfiguration.h>
@@ -41,6 +43,7 @@
 #import <FBSimulatorControl/FBSimulatorControl.h>
 #import <FBSimulatorControl/FBSimulatorControlConfiguration.h>
 #import <FBSimulatorControl/FBSimulatorControlFrameworkLoader.h>
+#import <FBSimulatorControl/FBSimulatorControlOperator.h>
 #import <FBSimulatorControl/FBSimulatorDiagnostics.h>
 #import <FBSimulatorControl/FBSimulatorEraseConfiguration.h>
 #import <FBSimulatorControl/FBSimulatorError.h>
@@ -55,6 +58,8 @@
 #import <FBSimulatorControl/FBSimulatorMediaCommands.h>
 #import <FBSimulatorControl/FBSimulatorMutableState.h>
 #import <FBSimulatorControl/FBSimulatorNotificationEventSink.h>
+#import <FBSimulatorControl/FBSimulatorPool+Private.h>
+#import <FBSimulatorControl/FBSimulatorPool.h>
 #import <FBSimulatorControl/FBSimulatorPredicates.h>
 #import <FBSimulatorControl/FBSimulatorProcessFetcher.h>
 #import <FBSimulatorControl/FBSimulatorScreenshotCommands.h>

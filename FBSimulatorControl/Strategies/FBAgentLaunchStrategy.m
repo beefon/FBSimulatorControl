@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBAgentLaunchStrategy.h"
@@ -56,38 +58,44 @@ typedef void (^FBAgentTerminationHandler)(int stat_loc);
 - (FBFuture<FBSimulatorAgentOperation *> *)launchAgent:(FBAgentLaunchConfiguration *)agentLaunch
 {
   FBSimulator *simulator = self.simulator;
-  return [[agentLaunch.output
-    createIOForTarget:simulator]
-    onQueue:simulator.workQueue fmap:^(FBProcessIO *io) {
-      return [self launchAgent:agentLaunch io:io];
+  return [[agentLaunch
+    createOutputForSimulator:simulator]
+    onQueue:simulator.workQueue fmap:^(NSArray<FBProcessOutput *> *outputs) {
+      FBProcessOutput *stdOut = outputs[0];
+      FBProcessOutput *stdErr = outputs[1];
+      return [self launchAgent:agentLaunch stdOut:stdOut stdErr:stdErr];
     }];
 }
 
-- (FBFuture<FBSimulatorAgentOperation *> *)launchAgent:(FBAgentLaunchConfiguration *)agentLaunch io:(FBProcessIO *)io
+- (FBFuture<FBSimulatorAgentOperation *> *)launchAgent:(FBAgentLaunchConfiguration *)agentLaunch stdOut:(FBProcessOutput *)stdOut stdErr:(FBProcessOutput *)stdErr
 {
   FBSimulator *simulator = self.simulator;
 
-  return [[io
-    attach]
-    onQueue:simulator.workQueue fmap:^(FBProcessIOAttachment *attachment) {
+  return [[FBFuture
+    futureWithFutures:@[[stdOut attachToFileHandle], [stdErr attachToFileHandle]]]
+    onQueue:simulator.workQueue fmap:^(NSArray<NSFileHandle *> *fileHandles) {
+      // Extract the File Handles
+      NSFileHandle *stdOutHandle = fileHandles[0];
+      NSFileHandle *stdErrHandle = fileHandles[1];
+
       // Launch the Process
-      FBMutableFuture<NSNumber *> *processStatusFuture = [FBMutableFuture futureWithNameFormat:@"Process completion of %@ on %@", agentLaunch.agentBinary.path, simulator.udid];
+      FBMutableFuture<NSNumber *> *processStatusFuture = FBMutableFuture.future;
       FBFuture<NSNumber *> *launchFuture = [FBAgentLaunchStrategy
         launchAgentWithSimulator:simulator
         launchPath:agentLaunch.agentBinary.path
         arguments:agentLaunch.arguments
         environment:agentLaunch.environment
         waitForDebugger:NO
-        stdOut:attachment.stdOut
-        stdErr:attachment.stdErr
+        stdOut:stdOutHandle
+        stdErr:stdErrHandle
         processStatusFuture:processStatusFuture];
 
       // Wrap in the container object
       return [[FBSimulatorAgentOperation
         operationWithSimulator:simulator
         configuration:agentLaunch
-        stdOut:io.stdOut
-        stdErr:io.stdErr
+        stdOut:stdOut
+        stdErr:stdErr
         launchFuture:launchFuture
         processStatusFuture:processStatusFuture]
         onQueue:self.simulator.workQueue notifyOfCompletion:^(FBFuture<FBSimulatorAgentOperation *> *future) {
@@ -109,9 +117,8 @@ typedef void (^FBAgentTerminationHandler)(int stat_loc);
 
 - (FBFuture<NSNumber *> *)launchAndNotifyOfCompletion:(FBAgentLaunchConfiguration *)agentLaunch consumer:(id<FBDataConsumer>)consumer
 {
-  FBProcessIO *io = [[FBProcessIO alloc] initWithStdIn:nil stdOut:[FBProcessOutput outputForDataConsumer:consumer] stdErr:FBProcessOutput.outputForNullDevice];
   return [[self
-    launchAgent:agentLaunch io:io]
+    launchAgent:agentLaunch stdOut:[FBProcessOutput outputForDataConsumer:consumer] stdErr:FBProcessOutput.outputForNullDevice]
     onQueue:self.simulator.workQueue fmap:^(FBSimulatorAgentOperation *operation) {
       return [operation exitCode];
     }];
@@ -119,7 +126,7 @@ typedef void (^FBAgentTerminationHandler)(int stat_loc);
 
 - (FBFuture<NSString *> *)launchConsumingStdout:(FBAgentLaunchConfiguration *)agentLaunch
 {
-  id<FBAccumulatingBuffer> consumer = FBDataBuffer.accumulatingBuffer;
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
   return [[self
     launchAndNotifyOfCompletion:agentLaunch consumer:consumer]
     onQueue:self.simulator.workQueue map:^(NSNumber *_) {
@@ -129,7 +136,7 @@ typedef void (^FBAgentTerminationHandler)(int stat_loc);
 
 #pragma mark Private
 
-+ (FBFuture<NSNumber *> *)launchAgentWithSimulator:(FBSimulator *)simulator launchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment waitForDebugger:(BOOL)waitForDebugger stdOut:(nullable FBProcessStreamAttachment *)stdOut stdErr:(nullable FBProcessStreamAttachment *)stdErr processStatusFuture:(FBMutableFuture<NSNumber *> *)processStatusFuture
++ (FBFuture<NSNumber *> *)launchAgentWithSimulator:(FBSimulator *)simulator launchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment waitForDebugger:(BOOL)waitForDebugger stdOut:(nullable NSFileHandle *)stdOut stdErr:(nullable NSFileHandle *)stdErr processStatusFuture:(FBMutableFuture<NSNumber *> *)processStatusFuture
 {
   // Get the Options
   NSDictionary<NSString *, id> *options = [FBAgentLaunchStrategy
@@ -142,22 +149,13 @@ typedef void (^FBAgentTerminationHandler)(int stat_loc);
     stdErr:stdErr];
 
   // The Process launches and terminates synchronously
-  FBMutableFuture<NSNumber *> *launchFuture = [FBMutableFuture futureWithNameFormat:@"Launch of %@ on %@", launchPath, simulator.udid];
+  FBMutableFuture<NSNumber *> *launchFuture = [FBMutableFuture future];
   [simulator.device
     spawnAsyncWithPath:launchPath
     options:options
     terminationQueue:simulator.workQueue
     terminationHandler:^(int stat_loc) {
-      // Notify that we're done with the process
       [processStatusFuture resolveWithResult:@(stat_loc)];
-      // Close any open file handles that we have.
-      // This is important because otherwise any reader will stall forever.
-      // The SimDevice APIs do not automatically close any file descriptor passed into them, so we need to do this on it's behalf.
-      // This would not be an issue if using simctl directly, as the stdout/stderr of the simctl process would close when the simctl process terminates.
-      // However, using the simctl approach, we don't get the pid of the spawned process, this is merely logged internally.
-      // Failing to close this end of the file descriptor would lead to the write-end of any pipe to not be closed and therefore it would leak.
-      close(stdOut.fileDescriptor);
-      close(stdErr.fileDescriptor);
     }
     completionQueue:simulator.workQueue
     completionHandler:^(NSError *innerError, pid_t processIdentifier){
@@ -170,16 +168,16 @@ typedef void (^FBAgentTerminationHandler)(int stat_loc);
   return launchFuture;
 }
 
-+ (NSDictionary<NSString *, id> *)simDeviceLaunchOptionsWithSimulator:(FBSimulator *)simulator launchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment waitForDebugger:(BOOL)waitForDebugger stdOut:(nullable FBProcessStreamAttachment *)stdOut stdErr:(nullable FBProcessStreamAttachment *)stdErr
++ (NSDictionary<NSString *, id> *)simDeviceLaunchOptionsWithSimulator:(FBSimulator *)simulator launchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment waitForDebugger:(BOOL)waitForDebugger stdOut:(nullable NSFileHandle *)stdOut stdErr:(nullable NSFileHandle *)stdErr
 {
   // argv[0] should be launch path of the process. SimDevice does not do this automatically, so we need to add it.
   arguments = [@[launchPath] arrayByAddingObjectsFromArray:arguments];
   NSMutableDictionary<NSString *, id> *options = [FBProcessLaunchConfiguration launchOptionsWithArguments:arguments environment:environment waitForDebugger:waitForDebugger];
   if (stdOut){
-    options[@"stdout"] = @(stdOut.fileDescriptor);
+    options[@"stdout"] = @([stdOut fileDescriptor]);
   }
   if (stdErr) {
-    options[@"stderr"] = @(stdErr.fileDescriptor);
+    options[@"stderr"] = @([stdErr fileDescriptor]);
   }
   if (simulator.state != FBiOSTargetStateBooted) {
     options[@"standalone"] = @YES;

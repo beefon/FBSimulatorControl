@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -11,8 +13,6 @@
 #import <FBControlCore/FBLaunchedProcess.h>
 
 NS_ASSUME_NONNULL_BEGIN
-
-static const size_t FBTaskOutputErrorMessageLength = 200;
 
 @class FBTaskConfiguration;
 
@@ -43,17 +43,15 @@ extern NSString *const FBTaskErrorDomain;
  The future returned will resolve when the process has terminated and can be ignored if not required.
 
  @param signo the signal number to send.
- @return a successful Future that resolves to the signal number when the process has terminated.
+ @return a Future that resolves when the process has termintated.
  */
-- (FBFuture<NSNumber *> *)sendSignal:(int)signo;
+- (FBFuture *)sendSignal:(int)signo;
 
 #pragma mark Accessors
 
 /**
  A future that resolves with the exit code when the process has finished.
  Cancelling this future will send a SIGTERM to the launched process.
- If the process exited with an exit code different than the acceptable
- values then the future will resolve to failure otherwise it will resolve to success.
  Any errors will also be surfaced in this future.
  */
 @property (nonatomic, strong, readonly) FBFuture<NSNumber *> *completed;

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestRunStrategy.h"
@@ -44,39 +46,56 @@
 
 - (FBFuture<NSNull *> *)execute
 {
-  NSError *error = nil;
-  FBBundleDescriptor *testRunnerApp = [FBBundleDescriptor bundleFromPath:self.configuration.runnerAppPath error:&error];
+  __block NSError *error = nil;
+  FBApplicationBundle *testRunnerApp = [FBApplicationBundle applicationWithPath:self.configuration.runnerAppPath error:&error];
   if (!testRunnerApp) {
     [self.logger logFormat:@"Failed to open test runner application: %@", error];
     return [FBFuture futureWithError:error];
   }
 
-  FBBundleDescriptor *testTargetApp;
+  FBApplicationBundle *testTargetApp;
   if (self.configuration.testTargetAppPath) {
-    testTargetApp = [FBBundleDescriptor bundleFromPath:self.configuration.testTargetAppPath error:&error];
+    testTargetApp = [FBApplicationBundle applicationWithPath:self.configuration.testTargetAppPath error:&error];
     if (!testTargetApp) {
       [self.logger logFormat:@"Failed to open test target application: %@", error];
       return [FBFuture futureWithError:error];
     }
   }
-
+  
+  NSMutableArray<FBApplicationBundle *> *additionalApplications = [NSMutableArray arrayWithCapacity:self.configuration.additionalApplicationPaths.count];
+  for (NSString *path in self.configuration.additionalApplicationPaths) {
+    FBApplicationBundle *app = [FBApplicationBundle applicationWithPath:path error:&error];
+    if (!app) {
+      [self.logger logFormat:@"Failed to open additional application: %@", error];
+      return [FBFuture futureWithError:error];
+    } else {
+      [additionalApplications addObject:app];
+    }
+  }
+  
   return [[self.target
     installApplicationWithPath:testRunnerApp.path]
     onQueue:self.target.workQueue fmap:^(id _) {
-      return [self startTestWithTestRunnerApp:testRunnerApp testTargetApp:testTargetApp];
+      return [self startTestWithTestRunnerApp:testRunnerApp testTargetApp:testTargetApp additionalApplications:additionalApplications];
     }];
 }
 
 #pragma mark Private
 
-- (FBFuture<NSNull *> *)startTestWithTestRunnerApp:(FBBundleDescriptor *)testRunnerApp testTargetApp:(FBBundleDescriptor *)testTargetApp
+- (FBFuture<NSNull *> *)startTestWithTestRunnerApp:(FBApplicationBundle *)testRunnerApp testTargetApp:(FBApplicationBundle *)testTargetApp additionalApplications:(NSArray<FBApplicationBundle *> *)additionalApplications
 {
+  FBProcessOutputConfiguration *outputConfiguration = FBProcessOutputConfiguration.outputToDevNull;
+  if (self.configuration.runnerAppLogPath != nil) {
+    outputConfiguration = [FBProcessOutputConfiguration configurationWithStdOut:self.configuration.runnerAppLogPath
+                                                                         stdErr:self.configuration.runnerAppLogPath
+                                                                          error:NULL];
+  }
   FBApplicationLaunchConfiguration *appLaunch = [FBApplicationLaunchConfiguration
-    configurationWithBundleID:testRunnerApp.identifier
-    bundleName:testRunnerApp.identifier
+    configurationWithBundleID:testRunnerApp.bundleID
+    bundleName:testRunnerApp.bundleID
     arguments:@[]
     environment:self.configuration.processUnderTestEnvironment
-    output:FBProcessOutputConfiguration.outputToDevNull
+    output:outputConfiguration
     launchMode:FBApplicationLaunchModeFailIfRunning];
 
   FBTestLaunchConfiguration *testLaunchConfiguration = [[FBTestLaunchConfiguration
@@ -84,14 +103,15 @@
     withApplicationLaunchConfiguration:appLaunch];
 
   if (testTargetApp) {
-    testLaunchConfiguration = [[[testLaunchConfiguration
+    testLaunchConfiguration = [[[[testLaunchConfiguration
      withTargetApplicationPath:testTargetApp.path]
-     withTargetApplicationBundleID:testTargetApp.identifier]
+     withTargetApplicationBundleID:testTargetApp.bundleID]
+     withTestApplicationDependencies:[self _testApplicationDependenciesWithTestRunnerApp:testRunnerApp testTargetApp:testTargetApp additionalApplications:additionalApplications]]
      withUITesting:YES];
   }
 
-  if (self.configuration.testFilter != nil) {
-    NSSet<NSString *> *testsToRun = [NSSet setWithObject:self.configuration.testFilter];
+  if (self.configuration.testFilters.count > 0) {
+    NSSet<NSString *> *testsToRun = [NSSet setWithArray:self.configuration.testFilters];
     testLaunchConfiguration = [testLaunchConfiguration withTestsToRun:testsToRun];
   }
 
@@ -111,13 +131,13 @@
   return [[[[[runner
     connectAndStart]
     onQueue:self.target.workQueue fmap:^(FBTestManager *manager) {
-      FBFuture<id> *startedVideoRecording = self.configuration.videoRecordingPath != nil
-        ? (FBFuture<id> *) [self.target startRecordingToFile:self.configuration.videoRecordingPath]
-        : (FBFuture<id> *) FBFuture.empty;
+      FBFuture *startedVideoRecording = self.configuration.videoRecordingPath != nil
+        ? [self.target startRecordingToFile:self.configuration.videoRecordingPath]
+        : [FBFuture futureWithResult:NSNull.null];
 
-      FBFuture<id> *startedTailLog = self.configuration.osLogPath != nil
-        ? (FBFuture<id> *) [self _startTailLogToFile:self.configuration.osLogPath]
-        : (FBFuture<id> *) FBFuture.empty;
+      FBFuture *startedTailLog = self.configuration.osLogPath != nil
+        ? [self _startTailLogToFile:self.configuration.osLogPath]
+        : [FBFuture futureWithResult:NSNull.null];
 
       return [FBFuture futureWithFutures:@[[FBFuture futureWithResult:manager], startedVideoRecording, startedTailLog]];
     }]
@@ -131,13 +151,13 @@
     onQueue:self.target.workQueue fmap:^(FBTestManagerResult *result) {
       FBFuture *stoppedVideoRecording = self.configuration.videoRecordingPath != nil
         ? [self.target stopRecording]
-        : FBFuture.empty;
+        : [FBFuture futureWithResult:NSNull.null];
       FBFuture *stopTailLog = tailLogContinuation != nil
         ? [tailLogContinuation.completed cancel]
-        : FBFuture.empty;
+        : [FBFuture futureWithResult:NSNull.null];
       return [FBFuture futureWithFutures:@[[FBFuture futureWithResult:result], stoppedVideoRecording, stopTailLog]];
     }]
-    onQueue:self.target.workQueue fmap:^ FBFuture<NSNull *> * (NSArray<id> *results) {
+    onQueue:self.target.workQueue fmap:^(NSArray<id> *results) {
       FBTestManagerResult *result = results[0];
       if (self.configuration.videoRecordingPath != nil) {
         [self.reporter didRecordVideoAtPath:self.configuration.videoRecordingPath];
@@ -146,30 +166,52 @@
       if (self.configuration.osLogPath != nil) {
         [self.reporter didSaveOSLogAtPath:self.configuration.osLogPath];
       }
+      
+      if (self.configuration.runnerAppLogPath != nil) {
+        [self.reporter didSaveRunnerAppLogAtPath:self.configuration.runnerAppLogPath];
+      }
 
       if (self.configuration.testArtifactsFilenameGlobs != nil) {
         [self _saveTestArtifactsOfTestRunnerApp:testRunnerApp withFilenameMatchGlobs:self.configuration.testArtifactsFilenameGlobs];
       }
 
-      if (result.crash) {
+      if (result.crashDiagnostic) {
         return [[FBXCTestError
-          describeFormat:@"The Application Crashed during the Test Run\n%@", result.crash]
+          describeFormat:@"The Application Crashed during the Test Run\n%@", result.crashDiagnostic.asString]
           failFuture];
       }
       if (result.error) {
         [self.logger logFormat:@"Failed to execute test bundle %@", result.error];
         return [FBFuture futureWithError:result.error];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
+}
+
+- (NSDictionary<NSString *, NSString *> *)_testApplicationDependenciesWithTestRunnerApp:(FBApplicationBundle *)testRunnerApp testTargetApp:(FBApplicationBundle *)testTargetApp additionalApplications:(NSArray<FBApplicationBundle *> *)additionalApplications
+{
+  NSMutableArray<FBApplicationBundle *> *allApplications = [additionalApplications mutableCopy];
+  if (testRunnerApp) {
+    [allApplications addObject:testRunnerApp];
+  }
+  if (testTargetApp) {
+    [allApplications addObject:testTargetApp];
+  }
+  NSMutableDictionary<NSString *, NSString *> *testApplicationDependencies = [NSMutableDictionary new];
+  for (FBApplicationBundle *application in allApplications) {
+    if (application.path != nil && application.bundleID != nil) {
+      [testApplicationDependencies setObject:application.path forKey:application.bundleID];
+    }
+  }
+  return [testApplicationDependencies copy];
 }
 
 // Save test artifacts matches certain filename globs that are populated during test run
 // to a temporary folder so it can be obtained by external tools if needed.
-- (void)_saveTestArtifactsOfTestRunnerApp:(FBBundleDescriptor *)testRunnerApp withFilenameMatchGlobs:(NSArray<NSString *> *)filenameGlobs
+- (void)_saveTestArtifactsOfTestRunnerApp:(FBApplicationBundle *)testRunnerApp withFilenameMatchGlobs:(NSArray<NSString *> *)filenameGlobs
 {
   NSArray<FBDiagnostic *> *diagnostics = [[[FBDiagnosticQuery
-    filesInApplicationOfBundleID:testRunnerApp.identifier withFilenames:@[] withFilenameGlobs:filenameGlobs]
+    filesInApplicationOfBundleID:testRunnerApp.bundleID withFilenames:@[] withFilenameGlobs:filenameGlobs]
     run:self.target]
     await:nil];
 
@@ -200,7 +242,7 @@
   id<FBDataConsumer> logFileWriter = [FBFileWriter syncWriterForFilePath:logFilePath error:&error];
   if (logFileWriter == nil) {
     [self.logger logFormat:@"Could not create log file at %@: %@", self.configuration.osLogPath, error];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
   return [self.target tailLog:@[@"--style", @"syslog", @"--level", @"debug"] consumer:logFileWriter];

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBAMDevice.h"
@@ -71,10 +73,9 @@ static void FB_AMDeviceListenerCallback(AMDeviceNotification *notification, FBAM
 + (instancetype)managerWithCalls:(AMDCalls)calls Queue:(dispatch_queue_t)queue logger:(id<FBControlCoreLogger>)logger
 {
   FBAMDeviceManager *manager = [[self alloc] initWithCalls:calls queue:queue logger:logger];
+  [manager populateFromList];
   NSError *error = nil;
-  BOOL success = [manager populateFromListWithError:&error];
-  NSAssert(success, @"Failed to list devices %@", error);
-  success = [manager startListeningWithError:&error];
+  BOOL success = [manager startListeningWithError:&error];
   NSAssert(success, @"Failed to Start Listening %@", error);
   return manager;
 }
@@ -150,18 +151,14 @@ static void FB_AMDeviceListenerCallback(AMDeviceNotification *notification, FBAM
   return YES;
 }
 
-- (BOOL)populateFromListWithError:(NSError **)error
+- (void)populateFromList
 {
-  _Nullable CFArrayRef array = self.calls.CreateDeviceList();
-  if (array == NULL) {
-    return [[FBDeviceControlError describe:@"AMDCreateDeviceList returned NULL"] failBool:error];
-  }
+  CFArrayRef array = self.calls.CreateDeviceList();
   for (NSInteger index = 0; index < CFArrayGetCount(array); index++) {
     AMDeviceRef value = CFArrayGetValueAtIndex(array, index);
     [self deviceConnected:value];
   }
   CFRelease(array);
-  return YES;
 }
 
 static const NSTimeInterval ConnectionReuseTimeout = 10.0;
@@ -342,7 +339,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
       if (status != 0) {
         NSString *errorDescription = CFBridgingRelease(self.calls.CopyErrorText(status));
         return [[[FBDeviceControlError
-          describeFormat:@"SecureStartService Failed with %d %@", status, errorDescription]
+          describeFormat:@"Start Service Failed with %d %@", status, errorDescription]
           logger:self.logger]
           failFutureContext];
       }
@@ -358,7 +355,6 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
           } else {
             [self.logger logFormat:@"Invalidated service %@", service];
           }
-          return FBFuture.empty;
         }];
     }];
 }
@@ -430,7 +426,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
 
   [logger log:@"Disconnected from AMDevice"];
 
-  return FBFuture.empty;
+  return [FBFuture futureWithResult:NSNull.null];
 }
 
 - (NSString *)contextName

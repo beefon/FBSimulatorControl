@@ -1,15 +1,19 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 #import <CoreSimulator/SimDeviceNotifier-Protocol.h>
 
-__attribute__((visibility("hidden")))
+@class NSMutableDictionary;
+@protocol OS_dispatch_queue;
+
 @interface SimDeviceNotificationManager : NSObject <SimDeviceNotifier>
 {
     NSObject<OS_dispatch_queue> *_handlersQueue;
@@ -18,14 +22,15 @@ __attribute__((visibility("hidden")))
     NSObject<OS_dispatch_queue> *_sendQueue;
 }
 
-@property(retain, nonatomic) NSObject<OS_dispatch_queue> *sendQueue; // @synthesize sendQueue=_sendQueue;
-@property(nonatomic) unsigned long long next_regID; // @synthesize next_regID=_next_regID;
-@property(retain, nonatomic) NSMutableDictionary *handlers; // @synthesize handlers=_handlers;
-@property(retain, nonatomic) NSObject<OS_dispatch_queue> *handlersQueue; // @synthesize handlersQueue=_handlersQueue;
-- (void)sendNotification:(id)arg1 completionQueue:(id)arg2 completionBlock:(CDUnknownBlockType)arg3;
+@property (retain, nonatomic) NSObject<OS_dispatch_queue> *sendQueue;
+@property (nonatomic, assign) unsigned long long next_regID;
+@property (retain, nonatomic) NSMutableDictionary *handlers;
+@property (retain, nonatomic) NSObject<OS_dispatch_queue> *handlersQueue;
+
 - (void)sendNotification:(id)arg1;
 - (BOOL)unregisterNotificationHandler:(unsigned long long)arg1 error:(id *)arg2;
 - (unsigned long long)registerNotificationHandlerOnQueue:(id)arg1 handler:(CDUnknownBlockType)arg2;
+- (unsigned long long)registerNotificationHandler:(CDUnknownBlockType)arg1;
 - (id)init;
 
 @end

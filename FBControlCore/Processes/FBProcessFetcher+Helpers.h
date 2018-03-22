@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -50,15 +52,6 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  A that determines if the provided process is currently running.
 
- @param processIdentifier the process identifier of the process.
- @param error an error out for any error that occurs
- @return YES if a matching process is found, NO otherwise.
- */
-- (BOOL)processIdentifierExists:(pid_t)processIdentifier error:(NSError **)error;
-
-/**
- A that determines if the provided process is currently running.
-
  @param process the Process to look for
  @param error an error out for any error that occurs
  @return YES if a matching process is found, NO otherwise.
@@ -66,13 +59,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)processExists:(FBProcessInfo *)process error:(NSError **)error;
 
 /**
- Uses the reciever to wait for the termination of a process identifier.
+ Uses the reciever to wait for the termination of a process.
 
  @param queue the queue to poll on.
- @param processIdentifier the pid of the process to wait for.
+ @param process the process to wait for.
  @return a Future that resolves when the process dies.
  */
-- (FBFuture<NSNull *> *)onQueue:(dispatch_queue_t)queue waitForProcessIdentifierToDie:(pid_t)processIdentifier;
+- (FBFuture<NSNull *> *)onQueue:(dispatch_queue_t)queue waitForProcessToDie:(FBProcessInfo *)process;
 
 /**
  Returns an Array of NSRunningApplications for the provided array of FBProcessInfo.

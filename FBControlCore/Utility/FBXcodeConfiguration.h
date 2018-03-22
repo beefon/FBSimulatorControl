@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -28,11 +30,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly, class) NSString *developerDirectory;
 
 /**
- The File Path to of Xcode's /Xcode.app/Contents directory.
- */
-@property (nonatomic, copy, readonly, class) NSString *contentsDirectory;
-
-/**
  The Version Number for the Xcode defined by the Developer Directory.
  */
 @property (nonatomic, copy, readonly, class) NSDecimalNumber *xcodeVersionNumber;
@@ -53,6 +50,16 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly, class) NSString *iosSDKVersion;
 
 /**
+ YES if Xcode 7 or greater, NO Otherwise.
+ */
+@property (nonatomic, assign, readonly, class) BOOL isXcode7OrGreater;
+
+/**
+ YES if Xcode 8 or greater, NO Otherwise.
+ */
+@property (nonatomic, assign, readonly, class) BOOL isXcode8OrGreater;
+
+/**
  YES if Xcode 9 or greater, NO Otherwise.
  */
 @property (nonatomic, assign, readonly, class) BOOL isXcode9OrGreater;
@@ -61,6 +68,11 @@ NS_ASSUME_NONNULL_BEGIN
  YES if Xcode 10 or greater, NO Otherwise.
  */
 @property (nonatomic, assign, readonly, class) BOOL isXcode10OrGreater;
+
+/**
+ YES if passing a custom SimDeviceSet to the Simulator App is Supported.
+ */
+@property (nonatomic, assign, readonly, class) BOOL supportsCustomDeviceSets;
 
 /**
  A Description of the Current Configuration.

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBDeviceApplicationCommands.h"
@@ -15,9 +17,9 @@
 #import "FBDevice+Private.h"
 #import "FBDevice.h"
 #import "FBDeviceApplicationLaunchStrategy.h"
-#import "FBDeviceApplicationProcess.h"
 #import "FBDeviceControlError.h"
 #import "FBDeviceDebuggerCommands.h"
+#import "FBiOSDeviceOperator.h"
 
 static void UninstallCallback(NSDictionary<NSString *, id> *callbackDictionary, FBAMDevice *device)
 {
@@ -83,7 +85,7 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
   // the app is installed first (FB_AMDeviceLookupApplications)
   return [[self.device.amDevice
     connectToDeviceWithPurpose:@"uninstall_%@", bundleID]
-    onQueue:self.device.workQueue pop:^ FBFuture<NSNull *> * (FBAMDevice *device) {
+    onQueue:self.device.workQueue pop:^(FBAMDevice *device) {
       [self.device.logger logFormat:@"Uninstalling Application %@", bundleID];
       int status = self.device.amDevice.calls.SecureUninstallApplication(
         0,
@@ -100,7 +102,7 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
           failFuture];
       }
       [self.device.logger logFormat:@"Uninstalled Application %@", bundleID];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -127,11 +129,9 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
   return [[self
     installedApplicationsData:FBDeviceApplicationCommands.installedApplicationLookupAttributes]
     onQueue:self.device.asyncQueue fmap:^FBFuture *(NSDictionary<NSString *, NSDictionary<NSString *, id> *> *applicationData) {
-      NSDictionary<NSString *, id> *app = applicationData[bundleID];
+      NSDictionary <NSString *, id> *app = applicationData[bundleID];
       if (!app) {
-        return [[FBDeviceControlError
-          describeFormat:@"Application with bundle ID: %@ is not installed. Installed apps %@ ", bundleID, [FBCollectionInformation oneLineDescriptionFromArray:applicationData.allKeys]]
-          failFuture];
+        return [[FBDeviceControlError describeFormat:@"Application with bundle ID: %@ is not installed", bundleID] failFuture];
       }
       FBInstalledApplication *application = [FBDeviceApplicationCommands installedApplicationFromDictionary:app];
       return [FBFuture futureWithResult:application];
@@ -153,21 +153,12 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
     }];
 }
 
-- (FBFuture<id> *)processIDWithBundleID:(NSString *)bundleID
-{
-  return [[FBDeviceControlError
-    describeFormat:@"-[%@ %@] is unimplemented", NSStringFromClass(self.class), NSStringFromSelector(_cmd)]
-    failFuture];
-}
-
 - (FBFuture<NSNull *> *)killApplicationWithBundleID:(NSString *)bundleID
 {
-  return [[FBDeviceControlError
-    describeFormat:@"-[%@ %@] is unimplemented", NSStringFromClass(self.class), NSStringFromSelector(_cmd)]
-    failFuture];
+  return [((FBiOSDeviceOperator *) self.device.deviceOperator) killApplicationWithBundleID:bundleID];
 }
 
-- (FBFuture<id<FBLaunchedProcess>> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration
+- (FBFuture<NSNumber *> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration
 {
   __block NSString *remoteAppPath = nil;
   return [[[self
@@ -180,7 +171,7 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
     }]
     onQueue:self.device.workQueue pop:^(FBAMDServiceConnection *connection) {
       return [[FBDeviceApplicationLaunchStrategy
-        strategyWithDevice:self.device debugConnection:connection logger:self.device.logger]
+        strategyWithDebugConnection:connection logger:self.device.logger]
         launchApplication:configuration remoteAppPath:remoteAppPath];
     }];
 }
@@ -189,23 +180,22 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
 
 - (FBFuture<NSNull *> *)transferAppURL:(NSURL *)appURL options:(NSDictionary *)options
 {
-  return [FBFuture
-    onQueue:self.device.workQueue resolve:^ FBFuture<NSNull *> * {
-      int status = self.device.amDevice.calls.SecureTransferPath(
-        0,
-        self.device.amDevice.amDevice,
-        (__bridge CFURLRef _Nonnull)(appURL),
-        (__bridge CFDictionaryRef _Nonnull)(options),
-        (AMDeviceProgressCallback) TransferCallback,
-        (__bridge void *) (self.device.amDevice)
-      );
-      if (status != 0) {
-        NSString *internalMessage = CFBridgingRelease(self.device.amDevice.calls.CopyErrorText(status));
-        return [[FBDeviceControlError
-          describeFormat:@"Failed to transfer '%@' with error (%@)", appURL, internalMessage]
-          failFuture];
-      }
-      return FBFuture.empty;
+  return [FBFuture onQueue:self.device.workQueue resolve:^ {
+    int status = self.device.amDevice.calls.SecureTransferPath(
+      0,
+      self.device.amDevice.amDevice,
+      (__bridge CFURLRef _Nonnull)(appURL),
+      (__bridge CFDictionaryRef _Nonnull)(options),
+      (AMDeviceProgressCallback) TransferCallback,
+      (__bridge void *) (self.device.amDevice)
+    );
+    if (status != 0) {
+      NSString *internalMessage = CFBridgingRelease(self.device.amDevice.calls.CopyErrorText(status));
+      return [[FBDeviceControlError
+        describeFormat:@"Failed to transfer '%@' with error (%@)", appURL, internalMessage]
+        failFuture];
+    }
+    return [FBFuture futureWithResult:NSNull.null];
   }];
 }
 
@@ -213,7 +203,7 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
 {
   return [[self.device.amDevice
     connectToDeviceWithPurpose:@"install"]
-    onQueue:self.device.workQueue pop:^ FBFuture<NSNull *> * (FBAMDevice *device) {
+    onQueue:self.device.workQueue pop:^(FBAMDevice *device) {
       [self.device.logger logFormat:@"Installing Application %@", appURL];
       int status = self.device.amDevice.calls.SecureInstallApplication(
         0,
@@ -230,7 +220,7 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
           failFuture];
       }
       [self.device.logger logFormat:@"Installed Application %@", appURL];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -281,7 +271,10 @@ static void TransferCallback(NSDictionary<NSString *, id> *callbackDictionary, F
     installTypeFromString:(app[FBApplicationInstallInfoKeyApplicationType] ?: @"")
     signerIdentity:(app[FBApplicationInstallInfoKeySignerIdentity] ? : @"")];
 
-  FBBundleDescriptor *bundle = [[FBBundleDescriptor alloc] initWithName:bundleName identifier:bundleID path:path binary:nil];
+  FBApplicationBundle *bundle = [FBApplicationBundle
+    applicationWithName:bundleName
+    path:path
+    bundleID:bundleID];
 
   return [FBInstalledApplication
     installedApplicationWithBundle:bundle

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestBundleConnection.h"
@@ -15,19 +17,18 @@
 #import <DTXConnectionServices/DTXProxyChannel.h>
 #import <DTXConnectionServices/DTXRemoteInvocationReceipt.h>
 #import <DTXConnectionServices/DTXTransport.h>
-#import <DTXConnectionServices/DTXSocketTransport.h>
+
+#import <IDEiOSSupportCore/DVTAbstractiOSDevice.h>
 
 #import <objc/runtime.h>
 
 #import <FBControlCore/FBCrashLogCommands.h>
 
 #import "XCTestBootstrapError.h"
+#import "FBDeviceOperator.h"
 #import "FBTestManagerContext.h"
 #import "FBTestManagerAPIMediator.h"
 #import "FBTestBundleResult.h"
-
-static NSTimeInterval BundleReadyTimeout = 20; // Time for `_XCT_testBundleReadyWithProtocolVersion` to be called after the 'connect'.
-static NSTimeInterval CrashCheckWaitLimit = 200;  // Time to wait for crash report to be generated.
 
 typedef NSString *FBTestBundleConnectionState NS_STRING_ENUM;
 static FBTestBundleConnectionState const FBTestBundleConnectionStateNotConnected = @"not connected";
@@ -44,7 +45,7 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
 
 @interface FBTestBundleConnection () <XCTestManager_IDEInterface>
 
-@property (nonatomic, strong, readonly) id<XCTestManager_IDEInterface, NSObject> interface;
+@property (nonatomic, weak, readonly) id<XCTestManager_IDEInterface, NSObject> interface;
 @property (nonatomic, strong, nullable, readonly) id<FBControlCoreLogger> logger;
 @property (nonatomic, strong, readonly) FBTestManagerContext *context;
 @property (nonatomic, strong, readonly) dispatch_queue_t requestQueue;
@@ -61,6 +62,9 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
 @property (atomic, strong, nullable, readwrite) id<XCTestDriverInterface> testBundleProxy;
 @property (atomic, strong, nullable, readwrite) DTXConnection *testBundleConnection;
 @property (atomic, strong, nullable, readwrite) NSDate *applicationLaunchDate;
+
+- (NSTimeInterval)bundleReadyTimeout;
+- (NSTimeInterval)crashCheckWaitLimit;
 
 @end
 
@@ -159,7 +163,7 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
   }
 
   [self doConnect];
-  return [self.connectFuture timeout:BundleReadyTimeout waitingFor:@"Connection to happen, %@ has not been called yet", NSStringFromSelector(@selector(_XCT_testBundleReadyWithProtocolVersion:minimumVersion:))];
+  return [self.connectFuture timeout:[self bundleReadyTimeout] waitingFor:@"Connection to happen, %@ has not been called yet", NSStringFromSelector(@selector(_XCT_testBundleReadyWithProtocolVersion:minimumVersion:))];
 }
 
 - (FBFuture<FBTestBundleResult *> *)startTestPlan
@@ -210,17 +214,16 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
   self.state = FBTestBundleConnectionStateConnecting;
   [self.logger log:@"Connecting Test Bundle"];
 
-  [[[[self.target
-    transportForTestManagerService]
-    onQueue:self.requestQueue enter:^(NSNumber *socket, FBMutableFuture<NSNull *> *teardown) {
-      DTXTransport *transport = [[objc_lookUpClass("DTXSocketTransport") alloc] initWithConnectedSocket:socket.intValue disconnectAction:^{
-        [teardown resolveWithResult:NSNull.null];
-      }];
+  [[[[FBFuture
+    onQueue:self.requestQueue resolve:^{
+      return [self.target.deviceOperator makeTransportForTestManagerServiceWithLogger:self.logger];
+    }]
+    onQueue:self.requestQueue map:^(DTXTransport *transport) {
       return [self setupTestBundleConnectionWithTransport:transport];
     }]
     onQueue:self.target.workQueue map:^(DTXConnection *connection) {
       return [self sendStartSessionRequestWithConnection:connection];
-    }]
+    }] 
     onQueue:self.target.workQueue handleError:^(NSError *innerError) {
       XCTestBootstrapError *error = [[XCTestBootstrapError
         describe:@"Failed to create secondary test manager transport"]
@@ -317,7 +320,8 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
       findCrashedProcessLog]
       onQueue:self.target.workQueue notifyOfCompletion:^(FBFuture<FBCrashLogInfo *> *future) {
         if (future.result) {
-          [self concludeWithResult:[FBTestBundleResult bundleCrashedDuringTestRun:future.result]];
+          FBDiagnostic *diagnostics = [future.result toDiagnostic:FBDiagnosticBuilder.builder];
+          [self concludeWithResult:[FBTestBundleResult bundleCrashedDuringTestRun:diagnostics]];
         } else {
           XCTestBootstrapError *error = [[XCTestBootstrapError
             describeFormat:@"Lost connection to test process with state '%@' with error: %@", state, future.error]
@@ -330,7 +334,7 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
 
 - (FBFuture<FBCrashLogInfo *> *)findCrashedProcessLog
 {
-  return [[self.target
+  return [[self.target.deviceOperator
     processIDWithBundleID:self.context.testRunnerBundleID]
     onQueue:self.target.workQueue chain:^FBFuture<FBTestBundleResult *> *(FBFuture<NSNumber *> *processIdentifierFuture) {
       if (processIdentifierFuture.result) {
@@ -348,7 +352,7 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
 
       return [[crashLog
         notifyOfCrash:[FBCrashLogInfo predicateForCrashLogsWithProcessID:self.context.testRunnerPID]]
-        timeout:CrashCheckWaitLimit
+        timeout:[self crashCheckWaitLimit]
         waitingFor:@"Getting crash log for process with pid %d, bunndle ID: %@", self.context.testRunnerPID, self.context.testRunnerBundleID];
     }];
 }
@@ -372,6 +376,28 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
   }
 
   return result;
+}
+
+// Time for `_XCT_testBundleReadyWithProtocolVersion` to be called after the 'connect'.
+- (NSTimeInterval)bundleReadyTimeout
+{
+    NSString *timeoutFromEnv = NSProcessInfo.processInfo.environment[@"FB_BUNDLE_READY_TIMEOUT"];
+    if (timeoutFromEnv) {
+        return timeoutFromEnv.doubleValue;
+    } else {
+        return 20;
+    }
+}
+
+// Time to wait for crash report to be generated.
+- (NSTimeInterval)crashCheckWaitLimit
+{
+    NSString *timeoutFromEnv = NSProcessInfo.processInfo.environment[@"FB_CRASH_CHECK_WAIT_LIMIT"];
+    if (timeoutFromEnv) {
+        return timeoutFromEnv.doubleValue;
+    } else {
+        return 20;
+    }
 }
 
 #pragma mark XCTestDriverInterface
@@ -425,6 +451,14 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
     [self concludeWithResult:[FBTestBundleResult failedInError:error]];
     return nil;
   }
+  if (!self.target.deviceOperator.requiresTestDaemonMediationForTestHostConnection) {
+    XCTestBootstrapError *error = [[XCTestBootstrapError
+      describe:@"Test Bundle Connection cannot handle a Device that doesn't require daemon mediation"]
+      code:XCTestBootstrapErrorCodeStartupFailure];
+    [self concludeWithResult:[FBTestBundleResult failedInError:error]];
+    return nil;
+  }
+
   [self.logger logFormat:@"Test Bundle is Ready"];
   self.state = FBTestBundleConnectionStateTestBundleReady;
   [self.connectFuture resolveWithResult:FBTestBundleResult.success];
@@ -444,6 +478,18 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
     causedBy:error]
    code:XCTestBootstrapErrorCodeStartupFailure];
   [self concludeWithResult:[FBTestBundleResult failedInError:trueError]];
+  return nil;
+}
+
+- (id)_XCT_logDebugMessage:(NSString *)debugMessage
+{
+  [self.interface _XCT_logDebugMessage:debugMessage];
+  return nil;
+}
+
+- (id)_XCT_logMessage:(NSString *)message
+{
+  [self.interface _XCT_logMessage:message];
   return nil;
 }
 

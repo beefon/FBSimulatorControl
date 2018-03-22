@@ -1,13 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestApplicationLaunchStrategy.h"
 
 #import <FBControlCore/FBControlCore.h>
+
+#import "FBDeviceOperator.h"
 
 @interface FBTestApplicationLaunchStrategy ()
 
@@ -43,7 +47,7 @@
   return [self.iosTarget installedApplicationWithBundleID:bundleID];
 }
 
-- (FBFuture<id<FBLaunchedProcess>> *)installAndLaunchApplication:(FBApplicationLaunchConfiguration *)configuration atPath:(NSString *)path
+- (FBFuture<NSNumber *> *)installAndLaunchApplication:(FBApplicationLaunchConfiguration *)configuration atPath:(NSString *)path
 {
   if (!path) {
     return [[FBControlCoreError
@@ -54,7 +58,7 @@
     isApplicationInstalledWithBundleID:configuration.bundleID]
     onQueue:self.iosTarget.workQueue fmap:^FBFuture<NSNull *> *(NSNumber *isInstalled) {
       if (!isInstalled.boolValue) {
-        return FBFuture.empty;
+        return [FBFuture futureWithResult:NSNull.null];
       }
       return [self.iosTarget uninstallApplicationWithBundleID:configuration.bundleID];
     }];
@@ -72,7 +76,7 @@
 - (FBFuture<NSNumber *> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration atPath:(NSString *)path
 {
   // Check if path points to installed app
-  return [[[self
+  return [[self
     installedAppWithBundleID:configuration.bundleID]
     onQueue:self.iosTarget.workQueue chain:^(FBFuture<FBInstalledApplication *> *future) {
       FBInstalledApplication *app = future.result;
@@ -80,9 +84,6 @@
         return [self.iosTarget launchApplication:configuration];
       }
       return [self installAndLaunchApplication:configuration atPath:path];
-    }]
-    onQueue:self.iosTarget.workQueue map:^(id<FBLaunchedProcess> process) {
-      return @(process.processIdentifier);
     }];
 }
 

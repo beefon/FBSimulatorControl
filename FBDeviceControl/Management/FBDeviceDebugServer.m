@@ -1,8 +1,10 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ /**
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBDeviceDebugServer.h"
@@ -13,8 +15,8 @@
 
 @interface FBDeviceDebugServer_TwistedPairFiles : NSObject
 
-@property (nonatomic, assign, readonly) int source;
-@property (nonatomic, assign, readonly) int sink;
+@property (nonatomic, strong, readonly) NSFileHandle *source;
+@property (nonatomic, strong, readonly) NSFileHandle *sink;
 @property (nonatomic, strong, readonly) dispatch_queue_t queue;
 
 @property (nonatomic, strong, nullable, readwrite) id<FBDispatchDataConsumer> sourceWriter;
@@ -26,7 +28,7 @@
 
 @implementation FBDeviceDebugServer_TwistedPairFiles
 
-- (instancetype)initWithSource:(int)source sink:(int)sink queue:(dispatch_queue_t)queue
+- (instancetype)initWithSource:(NSFileHandle *)source sink:(NSFileHandle *)sink queue:(dispatch_queue_t)queue
 {
   self = [super init];
   if (!self) {
@@ -44,14 +46,14 @@
 {
   return [[[FBFuture
     futureWithFutures:@[
-      [FBFileWriter asyncDispatchDataWriterWithFileDescriptor:self.source closeOnEndOfFile:NO],
-      [FBFileWriter asyncDispatchDataWriterWithFileDescriptor:self.sink closeOnEndOfFile:NO],
+      [FBFileWriter asyncDispatchDataWriterWithFileHandle:self.source],
+      [FBFileWriter asyncDispatchDataWriterWithFileHandle:self.sink],
     ]]
     onQueue:self.queue fmap:^(NSArray<id<FBDispatchDataConsumer>> *consumers) {
       self.sourceWriter = consumers[0];
       self.sinkWriter = consumers[1];
-      self.sourceReader = [FBFileReader dispatchDataReaderWithFileDescriptor:self.source closeOnEndOfFile:NO consumer:consumers[1] logger:nil];
-      self.sinkReader = [FBFileReader dispatchDataReaderWithFileDescriptor:self.sink closeOnEndOfFile:NO consumer:consumers[0] logger:nil];
+      self.sourceReader = [FBFileReader dispatchDataReaderWithFileHandle:self.source consumer:consumers[1] logger:nil];
+      self.sinkReader = [FBFileReader dispatchDataReaderWithFileHandle:self.sink consumer:consumers[0] logger:nil];
       return [FBFuture futureWithFutures:@[
         [self.sourceReader startReading],
         [self.sinkReader startReading],
@@ -118,17 +120,18 @@
 
 #pragma mark FBSocketReaderDelegate
 
-- (void)socketServer:(FBSocketServer *)server clientConnected:(struct in6_addr)address fileDescriptor:(int)fileDescriptor
+- (void)socketServer:(FBSocketServer *)server clientConnected:(struct in6_addr)address handle:(NSFileHandle *)fileHandle
 {
   if (self.twistedPair) {
     [self.logger log:@"Rejecting connection, we have an existing pair"];
     NSData *data = [@"$NEUnspecified#00" dataUsingEncoding:NSASCIIStringEncoding];
-    write(fileDescriptor, data.bytes, data.length);
-    close(fileDescriptor);
+    [fileHandle writeData:data];
+    [fileHandle closeFile];
     return;
   }
   [self.logger log:@"Client connected, connecting all file handles"];
-  self.twistedPair = [[FBDeviceDebugServer_TwistedPairFiles alloc] initWithSource:fileDescriptor sink:self.serviceConnection.socket queue:self.queue];
+  NSFileHandle *serviceFileHandle = [[NSFileHandle alloc] initWithFileDescriptor:self.serviceConnection.socket closeOnDealloc:NO];
+  self.twistedPair = [[FBDeviceDebugServer_TwistedPairFiles alloc] initWithSource:fileHandle sink:serviceFileHandle queue:self.queue];
   [[[self.twistedPair
     start]
     onQueue:self.queue fmap:^(FBFuture<NSNull *> *finished) {

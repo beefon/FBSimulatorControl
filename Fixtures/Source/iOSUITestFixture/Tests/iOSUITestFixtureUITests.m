@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -16,11 +18,11 @@
 {
   [super setUp];
   self.continueAfterFailure = NO;
-  [[XCUIApplication new] launch];
 }
 
 - (void)testHelloWorld
 {
+  [[XCUIApplication new] launch];
   XCUIApplication *app = [XCUIApplication new];
   XCUIElement *button = app.buttons[@"Welcome"];
   [self expectationForPredicate:[NSPredicate predicateWithFormat:@"exists = 1 && hittable = 1"]
@@ -33,6 +35,25 @@
             evaluatedWithObject:app.staticTexts[@"Hello world"]
                         handler:nil];
   [self waitForExpectationsWithTimeout:10 handler:nil];
+}
+
+- (void)testThatFails
+{
+  XCUIApplication *app = [XCUIApplication new];
+  XCTAssertTrue(app.state == XCUIApplicationStateRunningForeground);
+}
+
+- (void)testThatPasses1
+{
+  XCUIApplication *app = [XCUIApplication new];
+  XCTAssertFalse(app.state == XCUIApplicationStateRunningForeground);
+}
+
+- (void)testThatPasses2
+{
+  [[XCUIApplication new] launch];
+  XCUIApplication *app = [XCUIApplication new];
+  XCTAssertTrue(app.state == XCUIApplicationStateRunningForeground);
 }
 
 @end

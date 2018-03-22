@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -71,14 +73,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  Called when the socket server has a new client connected.
- The File Descriptor will not be automatically be closed, so it's up to implementors to ensure that this happens so file descriptors do not leak.
+ The File Handle return will close on deallocation so it is up to consumers to retain it if it needs to use it.
  If you wish to reject the connection, close the file handle immediately.
 
  @param server the socket server.
  @param address the IP Address of the connected client.
- @param fileDescriptor the file descriptor of the connected socket.
+ @param fileHandle the file handle of the connected socket.
  */
-- (void)socketServer:(FBSocketServer *)server clientConnected:(struct in6_addr)address fileDescriptor:(int)fileDescriptor;
+- (void)socketServer:(FBSocketServer *)server clientConnected:(struct in6_addr)address handle:(NSFileHandle *)fileHandle;
 
 /**
  The Queue on which the Delegate will be called.

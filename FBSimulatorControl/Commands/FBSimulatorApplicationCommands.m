@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorApplicationCommands.h"
@@ -41,7 +43,6 @@
   }
 
   _simulator = simulator;
-
   return self;
 }
 
@@ -49,12 +50,16 @@
 
 - (FBFuture<NSNull *> *)installApplicationWithPath:(NSString *)path
 {
-  return [[[FBBundleDescriptor
+  return [[[FBApplicationBundle
     onQueue:self.simulator.asyncQueue findOrExtractApplicationAtPath:path logger:self.simulator.logger]
-    onQueue:self.simulator.workQueue pop:^(FBBundleDescriptor *bundle) {
-      return [self installExtractedApplicationWithPath:bundle.path];
+    onQueue:self.simulator.workQueue pop:^(FBExtractedApplication *extractedApplication) {
+      return [[self installExtractedApplicationWithPath:extractedApplication.bundle.path] mapReplace:extractedApplication];
     }]
-    mapReplace:NSNull.null];
+    onQueue:self.simulator.asyncQueue notifyOfCompletion:^(FBFuture<FBExtractedApplication *> *future) {
+      if (future.result.extractedPath) {
+        [NSFileManager.defaultManager removeItemAtURL:future.result.extractedPath error:nil];
+      }
+    }];
 }
 
 - (FBFuture<NSNumber *> *)isApplicationInstalledWithBundleID:(NSString *)bundleID
@@ -66,11 +71,14 @@
     }];
 }
 
-- (FBFuture<FBSimulatorApplicationOperation *> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration
+- (FBFuture<NSNumber *> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration
 {
-  return [[FBApplicationLaunchStrategy
+  return [[[FBApplicationLaunchStrategy
     strategyWithSimulator:self.simulator]
-    launchApplication:configuration];
+    launchApplication:configuration]
+    onQueue:self.simulator.workQueue map:^(FBSimulatorApplicationOperation *operation) {
+      return @(operation.processIdentifier);
+    }];
 }
 
 - (FBFuture<NSNull *> *)killApplicationWithBundleID:(NSString *)bundleID
@@ -119,7 +127,7 @@
     onQueue:self.simulator.workQueue fmap:^(FBInstalledApplication *_) {
       return [[self.simulator killApplicationWithBundleID:bundleID] fallback:NSNull.null];
     }]
-    onQueue:self.simulator.workQueue fmap:^ FBFuture<NSNull *> * (id _) {
+    onQueue:self.simulator.workQueue fmap:^(id _) {
       NSError *error = nil;
       if (![self.simulator.device uninstallApplication:bundleID withOptions:nil error:&error]) {
         return [[[FBSimulatorError
@@ -127,7 +135,7 @@
           causedBy:error]
           failFuture];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -144,9 +152,7 @@
   }
   FBInstalledApplication *application = [FBSimulatorApplicationCommands installedApplicationFromInfo:appInfo error:&error];
   if (!application) {
-    return [[FBSimulatorError
-      describeFormat:@"Application Info %@ could not be parsed: %@", [FBCollectionInformation oneLineDescriptionFromDictionary:appInfo], error]
-      failFuture];
+    return [[FBFuture futureWithError:error] rephraseFailure:@"Application with bundle id '%@' is not installed", bundleID];
   }
   return [FBFuture futureWithResult:application];
 }
@@ -165,18 +171,23 @@
     }];
 }
 
-- (FBFuture<NSDictionary<NSString *, NSNumber *> *> *)runningApplications
+- (FBFuture<NSDictionary<NSString *, FBProcessInfo *> *> *)runningApplications
 {
   return [[self.simulator
     serviceNamesAndProcessIdentifiersForSubstring:@"UIKitApplication"]
     onQueue:self.simulator.asyncQueue map:^(NSDictionary<NSString *, NSNumber *> *serviceNameToProcessIdentifier) {
-      NSMutableDictionary<NSString *, NSNumber *> *mapping = [NSMutableDictionary dictionary];
+      NSMutableDictionary<NSString *, FBProcessInfo *> *mapping = [NSMutableDictionary dictionary];
       for (NSString *serviceName in serviceNameToProcessIdentifier.allKeys) {
         NSString *bundleName = [FBSimulatorLaunchCtlCommands extractApplicationBundleIdentifierFromServiceName:serviceName];
         if (!bundleName) {
           continue;
         }
-        mapping[bundleName] = serviceNameToProcessIdentifier[serviceName];
+        NSNumber *processIdentifier = serviceNameToProcessIdentifier[serviceName];
+        FBProcessInfo *processInfo = [self.simulator.processFetcher.processFetcher processInfoFor:processIdentifier.intValue];
+        if (!processInfo) {
+          continue;
+        }
+        mapping[bundleName] = processInfo;
       }
       return mapping;
     }];
@@ -200,15 +211,6 @@
           failFuture];
       }
       return [FBFuture futureWithResult:processInfo];
-    }];
-}
-
-- (FBFuture<NSNumber *> *)processIDWithBundleID:(NSString *)bundleID
-{
-  return [[self
-    runningApplicationWithBundleID:bundleID]
-    onQueue:self.simulator.workQueue map:^(FBProcessInfo *info) {
-      return @(info.processIdentifier);
     }];
 }
 
@@ -249,7 +251,7 @@ static NSString *const KeyDataContainer = @"DataContainer";
       fail:error];
   }
 
-  FBBundleDescriptor *bundle = [FBBundleDescriptor bundleFromPath:appPath error:error];
+  FBApplicationBundle *bundle = [FBApplicationBundle applicationWithPath:appPath error:error];
   if (!bundle) {
     return nil;
   }
@@ -264,15 +266,15 @@ static NSString *const KeyDataContainer = @"DataContainer";
 {
   return [[self
     confirmCompatibilityOfApplicationAtPath:path]
-    onQueue:self.simulator.workQueue fmap:^FBFuture *(FBBundleDescriptor *application) {
+    onQueue:self.simulator.workQueue fmap:^FBFuture *(FBApplicationBundle *application) {
       NSDictionary *options = @{
-        @"CFBundleIdentifier": application.identifier
+        @"CFBundleIdentifier": application.bundleID
       };
       NSURL *appURL = [NSURL fileURLWithPath:application.path];
 
       NSError *error = nil;
       if ([self.simulator.device installApplication:appURL withOptions:options error:&error]) {
-        return FBFuture.empty;
+        return [FBFuture futureWithResult:NSNull.null];
       }
 
       // Retry install if the first attempt failed with 'Failed to load Info.plist...'.
@@ -283,7 +285,7 @@ static NSString *const KeyDataContainer = @"DataContainer";
         [self.simulator.logger log:@"Retrying install due to reinstall bug"];
         error = nil;
         if ([self.simulator.device installApplication:appURL withOptions:options error:&error]) {
-          return FBFuture.empty;
+          return [FBFuture futureWithResult:NSNull.null];
         }
       }
 
@@ -294,10 +296,10 @@ static NSString *const KeyDataContainer = @"DataContainer";
     }];
 }
 
-- (FBFuture<FBBundleDescriptor *> *)confirmCompatibilityOfApplicationAtPath:(NSString *)path
+- (FBFuture<FBApplicationBundle *> *)confirmCompatibilityOfApplicationAtPath:(NSString *)path
 {
   NSError *error = nil;
-  FBBundleDescriptor *application = [FBBundleDescriptor bundleFromPath:path error:&error];
+  FBApplicationBundle *application = [FBApplicationBundle applicationWithPath:path error:&error];
   if (!application) {
     return [[[FBSimulatorError
       describeFormat:@"Could not determine Application information for path %@", path]
@@ -306,7 +308,7 @@ static NSString *const KeyDataContainer = @"DataContainer";
   }
 
   return [[self.simulator
-    installedApplicationWithBundleID:application.identifier]
+    installedApplicationWithBundleID:application.bundleID]
     onQueue:self.simulator.workQueue chain:^FBFuture *(FBFuture<FBInstalledApplication *> *future) {
       FBInstalledApplication *installed = future.result;
       if (installed && installed.installType == FBApplicationInstallTypeSystem) {

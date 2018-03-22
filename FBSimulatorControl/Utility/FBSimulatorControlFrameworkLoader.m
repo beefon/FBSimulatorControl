@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorControlFrameworkLoader.h"
@@ -10,16 +12,6 @@
 #import <FBControlCore/FBControlCore.h>
 
 #import <CoreSimulator/NSUserDefaults-SimDefaults.h>
-
-static void FBSimulatorControl_SimLogHandler(int level, const char *function, int lineNumber, NSString *format, ...)
-{
-  va_list args;
-  va_start(args, format);
-  NSString *string = [[NSString alloc] initWithFormat:format arguments:args];
-  va_end(args);
-  id<FBControlCoreLogger> logger = [FBControlCoreGlobalConfiguration.defaultLogger withName:@"CoreSimulator"];
-  [logger log:string];
-}
 
 @interface FBSimulatorControlFrameworkLoader_Essential : FBSimulatorControlFrameworkLoader
 
@@ -34,7 +26,7 @@ static void FBSimulatorControl_SimLogHandler(int level, const char *function, in
   static dispatch_once_t onceToken;
   static FBSimulatorControlFrameworkLoader *loader;
   dispatch_once(&onceToken, ^{
-    loader = [FBSimulatorControlFrameworkLoader_Essential loaderWithName:@"FBSimulatorControl" frameworks:@[
+    loader = [FBSimulatorControlFrameworkLoader loaderWithName:@"FBSimulatorControl" frameworks:@[
       FBWeakFramework.CoreSimulator,
     ]];
   });
@@ -66,8 +58,6 @@ static void FBSimulatorControl_SimLogHandler(int level, const char *function, in
   }
   BOOL loaded = [super loadPrivateFrameworks:logger error:error];
   if (loaded) {
-    // Hook the default handler to call us instead.
-    [FBSimulatorControlFrameworkLoader_Essential setInternalLogHandler];
     // Set CoreSimulator Logging since it is now loaded.
     [FBSimulatorControlFrameworkLoader_Essential setCoreSimulatorLoggingEnabled:(logger.level >= FBControlCoreLogLevelDebug)];
   }
@@ -83,20 +73,6 @@ static void FBSimulatorControl_SimLogHandler(int level, const char *function, in
   }
   NSUserDefaults *simulatorDefaults = [NSUserDefaults simulatorDefaults];
   [simulatorDefaults setBool:enabled forKey:@"DebugLogging"];
-}
-
-+ (BOOL)setInternalLogHandler
-{
-  void *coreSimulatorBundle = [[NSBundle bundleWithIdentifier:@"com.apple.CoreSimulator"] dlopenExecutablePath];
-  if (!coreSimulatorBundle) {
-    return NO;
-  }
-  void (*SetHandler)(void *) = FBGetSymbolFromHandleOptional(coreSimulatorBundle, "SimLogSetHandler");
-  if (!SetHandler) {
-    return NO;
-  }
-  SetHandler(FBSimulatorControl_SimLogHandler);
-  return YES;
 }
 
 @end

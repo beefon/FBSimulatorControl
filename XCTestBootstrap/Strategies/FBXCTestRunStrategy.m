@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestRunStrategy.h"
@@ -11,6 +13,7 @@
 #import <XCTestBootstrap/XCTestBootstrap.h>
 #import <FBControlCore/FBControlCore.h>
 
+#import "FBDeviceOperator.h"
 #import "FBProductBundle.h"
 #import "FBTestManager.h"
 #import "FBTestManagerContext.h"
@@ -66,17 +69,17 @@
         withTestRunnerConfiguration:runnerConfiguration];
       return [[self.iosTarget
         launchApplication:applicationConfiguration]
-        onQueue:self.iosTarget.workQueue map:^(id<FBLaunchedProcess> process) {
-          return @[process, runnerConfiguration];
+        onQueue:self.iosTarget.workQueue map:^(NSNumber *processIdentifier) {
+          return @[processIdentifier, runnerConfiguration];
         }];
     }]
     onQueue:self.iosTarget.workQueue fmap:^(NSArray<id> *tuple) {
-      id<FBLaunchedProcess> applicationProcess = tuple[0];
+      NSNumber *processIdentifier = tuple[0];
       FBTestRunnerConfiguration *runnerConfiguration = tuple[1];
 
       // Make the Context for the Test Manager.
       FBTestManagerContext *context = [FBTestManagerContext
-        contextWithTestRunnerPID:applicationProcess.processIdentifier
+        contextWithTestRunnerPID:processIdentifier.intValue
         testRunnerBundleID:runnerConfiguration.testRunner.bundleID
         sessionIdentifier:runnerConfiguration.sessionIdentifier];
 

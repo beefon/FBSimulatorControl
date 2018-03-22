@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -18,7 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  An Operation for an Application.
  */
-@interface FBSimulatorApplicationOperation : NSObject <FBLaunchedProcess, FBiOSTargetContinuation, FBJSONSerializable>
+@interface FBSimulatorApplicationOperation : NSObject <FBiOSTargetContinuation, FBJSONSerializable>
 
 #pragma mark Helper Methods
 
@@ -42,6 +44,12 @@ NS_ASSUME_NONNULL_BEGIN
  The Process Identifier of the Launched Process.
  */
 @property (nonatomic, assign, readonly) pid_t processIdentifier;
+
+/**
+ The Launched Process Info.
+ This may be nil in the event that the process was short lived and the process info could not be obtained.
+ */
+@property (nonatomic, copy, readonly) FBProcessInfo *processInfo;
 
 /**
  The stderr of the launched process.

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -10,10 +12,6 @@
 #import <FBControlCore/FBControlCore.h>
 
 NS_ASSUME_NONNULL_BEGIN
-
-@class FBProcessOutput;
-
-@protocol FBiOSTarget;
 
 /**
  The Marker File Path if a File is to be output to a default location.
@@ -24,8 +22,6 @@ extern NSString *const FBProcessOutputToFileDefaultLocation;
  The Output Configuration for a Process.
  */
 @interface FBProcessOutputConfiguration : NSObject <NSCopying, FBJSONSerializable, FBJSONDeserializable>
-
-#pragma mark Initializers
 
 /**
  The Designated Initializer
@@ -65,8 +61,6 @@ extern NSString *const FBProcessOutputToFileDefaultLocation;
  */
 - (nullable instancetype)withStdErr:(id)stdErr error:(NSError **)error;
 
-#pragma mark Properties
-
 /**
  The Output Configuration for stdout.
  Must be one of the following:
@@ -86,16 +80,6 @@ extern NSString *const FBProcessOutputToFileDefaultLocation;
  - FBDataConsumer for consuming the output.
  */
 @property (nonatomic, strong, readonly) id stdErr;
-
-#pragma mark Public Methods
-
-/**
- Creates the IO wrapper object for a given target
-
- @param target the target to create the output for.
- @return a Future that wraps the IO.
- */
-- (FBFuture<FBProcessIO *> *)createIOForTarget:(id<FBiOSTarget>)target;
 
 @end
 

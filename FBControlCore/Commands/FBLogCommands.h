@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -16,18 +18,6 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol FBDataConsumer;
 
 /**
- A logging operation of indeterminate duration.
- */
-@protocol FBLogOperation <FBiOSTargetContinuation>
-
-/**
- The consumer of the operation.
- */
-@property (nonatomic, strong, readonly) id<FBDataConsumer> consumer;
-
-@end
-
-/**
  Commands for obtaining logs.
  */
 @protocol FBLogCommands <NSObject, FBiOSTargetCommand>
@@ -39,7 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param consumer the consumer to attach
  @return a Future that will complete when the log command has started successfully. The wrapped Awaitable can then be cancelled, or awaited until it is finished.
  */
-- (FBFuture<id<FBLogOperation>> *)tailLog:(NSArray<NSString *> *)arguments consumer:(id<FBDataConsumer>)consumer;
+- (FBFuture<id<FBiOSTargetContinuation>> *)tailLog:(NSArray<NSString *> *)arguments consumer:(id<FBDataConsumer>)consumer;
 
 /**
  Runs the log command, returning the results as an array of strings.

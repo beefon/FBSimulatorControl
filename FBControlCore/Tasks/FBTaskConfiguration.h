@@ -1,17 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
+#import <FBControlCore/FBProcessStream.h>
+
 NS_ASSUME_NONNULL_BEGIN
-
-@class FBProcessIO;
-
-@protocol FBControlCoreLogger;
 
 /**
  A Configuration for an FBTask.
@@ -21,7 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Creates a Task Configuration with the provided parameters.
  */
-- (instancetype)initWithLaunchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment acceptableStatusCodes:(NSSet<NSNumber *> *)acceptableStatusCode io:(FBProcessIO *)io logger:(nullable id<FBControlCoreLogger>)logger;
+- (instancetype)initWithLaunchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment acceptableStatusCodes:(NSSet<NSNumber *> *)acceptableStatusCodes stdOut:(nullable FBProcessOutput *)stdOut stdErr:(nullable FBProcessOutput *)stdErr stdIn:(nullable FBProcessInput *)stdIn;
 
 /**
  The Launch Path of the Process to launch.
@@ -44,14 +44,19 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly) NSSet<NSNumber *> *acceptableStatusCodes;
 
 /**
-The FBProcessIO object.
+The FBProcessOutput for stdout.
  */
-@property (nonatomic, strong, nullable, readonly) FBProcessIO *io;
+@property (nonatomic, strong, nullable, readonly) FBProcessOutput *stdOut;
 
 /**
- The logger to log to.
+ The FBProcessOutput for stderr.
  */
-@property (nonatomic, strong, nullable, readonly) id<FBControlCoreLogger> logger;
+@property (nonatomic, strong, nullable, readonly) FBProcessOutput *stdErr;
+
+/**
+ The FBProcessInput for stdin.
+ */
+@property (nonatomic, strong, nullable, readonly) FBProcessInput *stdIn;
 
 @end
 

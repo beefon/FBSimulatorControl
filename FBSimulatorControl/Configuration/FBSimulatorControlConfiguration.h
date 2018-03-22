@@ -1,15 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 #import <FBControlCore/FBControlCore.h>
 
-NS_ASSUME_NONNULL_BEGIN
+@class FBApplicationBundle ;
 
 /**
  Options that apply to each FBSimulatorControl instance.
@@ -21,6 +23,8 @@ typedef NS_OPTIONS(NSUInteger, FBSimulatorManagementOptions){
   FBSimulatorManagementOptionsIgnoreSpuriousKillFail = 1 << 3, /** Don't fail Pool creation when failing to kill spurious Simulators */
   FBSimulatorManagementOptionsKillSpuriousCoreSimulatorServices = 1 << 4, /** Kills CoreSimulatorService daemons from the non-current Xcode version when creating a Pool */
 };
+
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  A Value object with the information required to create a Simulator Pool.
@@ -34,7 +38,7 @@ typedef NS_OPTIONS(NSUInteger, FBSimulatorManagementOptions){
  @param deviceSetPath the Path to the Device Set. If nil, the default Device Set will be used.
  @return a new Configuration Object with the arguments applied.
  */
-+ (instancetype)configurationWithDeviceSetPath:(nullable NSString *)deviceSetPath options:(FBSimulatorManagementOptions)options logger:(nullable id<FBControlCoreLogger>)logger reporter:(nullable id<FBEventReporter>)reporter;
++ (instancetype)configurationWithDeviceSetPath:(nullable NSString *)deviceSetPath options:(FBSimulatorManagementOptions)options;
 
 /**
  The Location of the SimDeviceSet. If no path is provided, the default device set will be used.
@@ -45,16 +49,6 @@ typedef NS_OPTIONS(NSUInteger, FBSimulatorManagementOptions){
  The Options for Simulator Management.
  */
 @property (nonatomic, assign, readonly) FBSimulatorManagementOptions options;
-
-/**
- The Logger to use for logging.
- */
-@property (nonatomic, strong, nullable, readonly) id<FBControlCoreLogger> logger;
-
-/**
- The Event Reporter to use for reporting events.
- */
-@property (nonatomic, strong, nullable, readonly) id<FBEventReporter> reporter;
 
 @end
 

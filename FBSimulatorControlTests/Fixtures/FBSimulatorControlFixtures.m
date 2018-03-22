@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorControlFixtures.h"
@@ -15,10 +17,10 @@
 
 @implementation FBSimulatorControlFixtures
 
-+ (FBBundleDescriptor *)tableSearchApplicationWithError:(NSError **)error
++ (FBApplicationBundle *)tableSearchApplicationWithError:(NSError **)error
 {
   NSString *path = [[NSBundle bundleForClass:self] pathForResource:@"TableSearch" ofType:@"app"];
-  return [FBBundleDescriptor bundleFromPath:path error:error];
+  return [FBApplicationBundle applicationWithPath:path error:error];
 }
 
 + (NSString *)photo0Path
@@ -76,10 +78,10 @@
     withUITesting:NO];
 }
 
-- (FBBundleDescriptor *)tableSearchApplication
+- (FBApplicationBundle *)tableSearchApplication
 {
   NSError *error = nil;
-  FBBundleDescriptor *value = [FBSimulatorControlFixtures tableSearchApplicationWithError:&error];
+  FBApplicationBundle *value = [FBSimulatorControlFixtures tableSearchApplicationWithError:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(value);
   return value;
@@ -90,7 +92,7 @@ static NSString *const MobileSafariBundleIdentifier = @"com.apple.mobilesafari";
 
 - (FBApplicationLaunchConfiguration *)tableSearchAppLaunch
 {
-  FBBundleDescriptor *application = self.tableSearchApplication;
+  FBApplicationBundle *application = self.tableSearchApplication;
   if (!application) {
     return nil;
   }
@@ -130,6 +132,9 @@ static NSString *const MobileSafariBundleIdentifier = @"com.apple.mobilesafari";
 - (nullable NSString *)iOSUnitTestBundlePath
 {
   NSString *bundlePath = FBSimulatorControlFixtures.iOSUnitTestBundlePath;
+  if (!FBXcodeConfiguration.isXcode8OrGreater) {
+    return bundlePath;
+  }
   id<FBCodesignProvider> codesign = FBCodesignProvider.codeSignCommandWithAdHocIdentity;
   if ([[codesign cdHashForBundleAtPath:bundlePath] await:nil]) {
     return bundlePath;

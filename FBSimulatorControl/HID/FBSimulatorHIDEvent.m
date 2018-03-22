@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorHIDEvent.h"
@@ -24,8 +26,6 @@ static NSString *const EventClassStringTouch = @"touch";
 static NSString *const EventClassStringButton = @"button";
 static NSString *const EventClassStringKeyboard = @"keyboard";
 static NSString *const EventClassStringDelay = @"delay";
-
-const double DEFAULT_SWIPE_DELTA = 10.0;
 
 @interface FBSimulatorHIDEvent ()
 
@@ -119,7 +119,7 @@ static NSString *const KeyEvents = @"events";
 - (FBFuture<NSNull *> *)performEvents:(NSArray<FBSimulatorHIDEvent *> *)events onHid:(FBSimulatorHID *)hid
 {
   if (events.count == 0) {
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
   FBSimulatorHIDEvent *event = events.firstObject;
   NSArray<FBSimulatorHIDEvent *> *next = events.count == 1 ? @[] : [events subarrayWithRange:NSMakeRange(1, events.count - 1)];
@@ -250,7 +250,7 @@ static NSString *const KeyY = @"y";
 
 - (NSUInteger)hash
 {
-  return (NSUInteger) self.direction | ((NSUInteger) self.x ^ (NSUInteger) self.y);
+  return self.direction | ((NSUInteger) self.x ^ (NSUInteger) self.y);
 }
 
 @end
@@ -355,7 +355,7 @@ static NSString *const ButtonSiri = @"siri";
 
 - (NSUInteger)hash
 {
-  return (NSUInteger) self.type ^ (NSUInteger) self.button;
+  return self.type ^ self.button;
 }
 
 + (NSString *)buttonStringFromButton:(FBSimulatorHIDButton)button
@@ -488,7 +488,7 @@ static NSString *const KeyKeycode = @"keycode";
 
 - (NSUInteger)hash
 {
-  return (NSUInteger) self.direction ^ (NSUInteger) self.keyCode;
+  return self.direction ^ self.keyCode;
 }
 
 @end
@@ -545,7 +545,7 @@ static NSString *const KeyDuration = @"duration";
 
 - (FBFuture<NSNull *> *)performOnHID:(FBSimulatorHID *)hid
 {
-  return [FBFuture futureWithDelay:self.duration future:FBFuture.empty];
+  return [FBFuture futureWithDelay:self.duration future:[FBFuture futureWithResult:NSNull.null]];
 }
 
 - (NSString *)description
@@ -647,9 +647,6 @@ static NSString *const KeyDuration = @"duration";
 {
   NSMutableArray<FBSimulatorHIDEvent *> *events = [NSMutableArray array];
   double distance = sqrt(pow(yEnd - yStart, 2) + pow(xEnd - xStart, 2));
-  if (delta <= 0.0) {
-    delta = DEFAULT_SWIPE_DELTA;
-  }
   int steps = (int)(distance / delta);
 
   double dx = (xEnd - xStart) / steps;

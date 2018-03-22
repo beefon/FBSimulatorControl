@@ -1,13 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 #import <FBControlCore/FBControlCore.h>
+
+#import <XCTestBootstrap/XCTestBootstrap.h>
 
 #import <FBSimulatorControl/FBSimulatorAgentCommands.h>
 #import <FBSimulatorControl/FBSimulatorApplicationCommands.h>
@@ -32,11 +36,12 @@ NS_ASSUME_NONNULL_BEGIN
 @class FBProcessInfo;
 @class FBSimulatorConfiguration;
 @class FBSimulatorDiagnostics;
+@class FBSimulatorPool;
 @class FBSimulatorSet;
 @class SimDevice;
 
 /**
- An implementation of FBiOSTarget for iOS Simulators.
+ Defines the High-Level Properties and Methods that exist on any Simulator returned from `FBSimulatorPool`.
  */
 @interface FBSimulator : NSObject <FBiOSTarget, FBCrashLogCommands, FBScreenshotCommands, FBSimulatorAgentCommands, FBSimulatorApplicationCommands, FBApplicationDataCommands, FBSimulatorBridgeCommands, FBSimulatorKeychainCommands, FBSimulatorSettingsCommands, FBSimulatorXCTestCommands, FBSimulatorLifecycleCommands, FBSimulatorLaunchCtlCommands, FBSimulatorMediaCommands>
 
@@ -54,6 +59,11 @@ NS_ASSUME_NONNULL_BEGIN
  The Simulator Set that the Simulator belongs to.
  */
 @property (nonatomic, weak, readonly, nullable) FBSimulatorSet *set;
+
+/**
+ The Pool to which the Simulator belongs, if Any.
+ */
+@property (nonatomic, weak, readonly, nullable) FBSimulatorPool *pool;
 
 /**
  Where the events for the Simulator should be sent.

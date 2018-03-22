@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -23,7 +25,7 @@
   // Setup
   NSPipe *pipe = NSPipe.pipe;
   NSError *error = nil;
-  id<FBDataConsumer, FBDataConsumerLifecycle> writer = [FBFileWriter asyncWriterWithFileDescriptor:pipe.fileHandleForWriting.fileDescriptor closeOnEndOfFile:YES error:&error];
+  id<FBDataConsumer, FBDataConsumerLifecycle> writer = [FBFileWriter asyncWriterWithFileHandle:pipe.fileHandleForWriting error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(writer);
 
@@ -36,7 +38,7 @@
 
   // Close the writer by consuming the end of file
   [writer consumeEndOfFile];
-  BOOL success = [writer.finishedConsuming await:&error] != nil;
+  BOOL success = [writer.eofHasBeenReceived await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
 
@@ -50,7 +52,7 @@
   NSError *error = nil;
   NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
   NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:filePath];
-  id<FBDataConsumer, FBDataConsumerLifecycle> writer = [FBFileWriter asyncWriterWithFileDescriptor:fileHandle.fileDescriptor closeOnEndOfFile:YES error:&error];
+  id<FBDataConsumer, FBDataConsumerLifecycle> writer = [FBFileWriter asyncWriterWithFileHandle:fileHandle error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(writer);
 
@@ -62,7 +64,7 @@
 
 - (void)testOpeningAFifoAtBothEndsAsynchronously
 {
-  id<FBAccumulatingBuffer> consumer = [FBDataBuffer accumulatingBuffer];
+  id<FBAccumulatingBuffer> consumer = [FBLineBuffer accumulatingBuffer];
 
   NSString *fifoPath = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
   int status = mkfifo(fifoPath.UTF8String, S_IWUSR | S_IRUSR);
@@ -93,7 +95,7 @@
   XCTAssertNil(error);
   XCTAssertTrue(success);
 
-  success = [consumer.finishedConsuming await:&error] != nil;
+  success = [consumer.eofHasBeenReceived await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
 }

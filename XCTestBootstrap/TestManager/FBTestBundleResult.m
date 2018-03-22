@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestBundleResult.h"
@@ -24,7 +26,7 @@
   return nil;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)diagnostic
 {
   return nil;
 }
@@ -51,7 +53,7 @@
   return nil;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)diagnostic
 {
   return nil;
 }
@@ -64,22 +66,19 @@
 @end
 
 @interface FBTestBundleResult_CrashedDuringTestRun : FBTestBundleResult
-
-@property (nonatomic, strong, readonly) FBCrashLogInfo *underlyingCrash;
-
+@property (nonatomic, strong, readonly) FBDiagnostic *underlyingDiagnostic;
 @end
 
 @implementation FBTestBundleResult_CrashedDuringTestRun
 
-- (instancetype)initWithCrash:(FBCrashLogInfo *)crash
+- (instancetype)initWithDiagnostic:(FBDiagnostic *)diagnostic
 {
   self = [super init];
   if (!self) {
     return nil;
   }
 
-  _underlyingCrash = crash;
-
+  _underlyingDiagnostic = diagnostic;
   return self;
 }
 
@@ -91,18 +90,18 @@
 - (NSError *)error
 {
   return [[XCTestBootstrapError
-    describeFormat:@"The Test Bundle Crashed during the Test Run %@", self.crash]
+    describeFormat:@"The Test Bundle Crashed during the Test Run %@", self.diagnostic.asString]
     build];
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)diagnostic
 {
-  return self.underlyingCrash;
+  return self.underlyingDiagnostic;
 }
 
 - (NSString *)description
 {
-  return [NSString stringWithFormat:@"Bundle Connection crashed during test run: %@", self.crash];
+  return [NSString stringWithFormat:@"Bundle Connection crashed during test run: %@", self.diagnostic];
 }
 
 @end
@@ -137,7 +136,7 @@
   return [self.underlyingError build];
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)diagnostic
 {
   return nil;
 }
@@ -163,9 +162,9 @@
   return [FBTestBundleResult_ClientRequestedDisconnect new];
 }
 
-+ (instancetype)bundleCrashedDuringTestRun:(FBCrashLogInfo *)crash
++ (instancetype)bundleCrashedDuringTestRun:(FBDiagnostic *)diagnostic
 {
-  return [[FBTestBundleResult_CrashedDuringTestRun alloc] initWithCrash:crash];
+  return [[FBTestBundleResult_CrashedDuringTestRun alloc] initWithDiagnostic:diagnostic];
 }
 
 + (instancetype)failedInError:(XCTestBootstrapError *)error
@@ -187,7 +186,7 @@
   return nil;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)diagnostic
 {
   NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
   return nil;

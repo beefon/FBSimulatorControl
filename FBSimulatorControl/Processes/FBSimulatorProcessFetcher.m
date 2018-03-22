@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorProcessFetcher.h"
@@ -13,7 +15,7 @@
 
 #import <FBControlCore/FBControlCore.h>
 
-#import "FBBundleDescriptor+Simulator.h"
+#import "FBApplicationBundle+Simulator.h"
 #import "FBSimulator.h"
 #import "FBSimulatorControlConfiguration.h"
 
@@ -153,7 +155,7 @@ NSString *const FBSimulatorControlSimulatorLaunchEnvironmentDeviceSetPath = @"FB
 + (NSPredicate *)simulatorProcessesWithCorrectLaunchPath
 {
   return [NSPredicate predicateWithBlock:^ BOOL (FBProcessInfo *process, NSDictionary *_) {
-    return [process.launchPath isEqualToString:FBBundleDescriptor.xcodeSimulator.binary.path];
+    return [process.launchPath isEqualToString:FBApplicationBundle.xcodeSimulator.binary.path];
   }];
 }
 

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorBootVerificationStrategy.h"
@@ -108,7 +110,7 @@ static NSTimeInterval BootVerificationStallInterval = 1.5; // 60s
       describeFormat:@"Not booted, status is %@", bootInfo]
       failFuture];
   }
-  return FBFuture.empty;
+  return [FBFuture futureWithResult:NSNull.null];
 }
 
 - (void)updateBootInfo:(SimDeviceBootInfo *)bootInfo
@@ -203,7 +205,7 @@ static NSTimeInterval BootVerificationStallInterval = 1.5; // 60s
 {
   return [[self.simulator
     listServices]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSDictionary<NSString *, id> *services) {
+    onQueue:self.simulator.asyncQueue fmap:^(NSDictionary<NSString *, id> *services) {
       NSDictionary<id, NSString *> *processIdentifiers = [NSDictionary
         dictionaryWithObjects:self.requiredServiceNames
         forKeys:[services objectsForKeys:self.requiredServiceNames notFoundMarker:NSNull.null]];
@@ -212,7 +214,7 @@ static NSTimeInterval BootVerificationStallInterval = 1.5; // 60s
           describeFormat:@"Service %@ has not started", processIdentifiers[NSNull.null]]
           failFuture];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -237,17 +239,25 @@ static NSTimeInterval BootVerificationStallInterval = 1.5; // 60s
         @"com.apple.SpringBoard",
       ];
     }
+    if (FBXcodeConfiguration.isXcode8OrGreater ) {
       return @[
         @"com.apple.backboardd",
         @"com.apple.mobile.installd",
         @"com.apple.SimulatorBridge",
         @"com.apple.SpringBoard",
       ];
+    }
   }
   if (family == FBControlCoreProductFamilyAppleWatch || family == FBControlCoreProductFamilyAppleTV) {
+    if (FBXcodeConfiguration.isXcode8OrGreater) {
+      return @[
+        @"com.apple.mobileassetd",
+        @"com.apple.nsurlsessiond",
+      ];
+    }
     return @[
       @"com.apple.mobileassetd",
-      @"com.apple.nsurlsessiond",
+      @"com.apple.networkd",
     ];
   }
   return @[];

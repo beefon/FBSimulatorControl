@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBBinaryParser.h"
@@ -16,18 +18,13 @@
 
 #import "FBControlCoreError.h"
 
-FBBinaryArchitecture const FBBinaryArchitecturei386 = @"i386";
-FBBinaryArchitecture const FBBinaryArchitecturex86_64 = @"x86_64";
-FBBinaryArchitecture const FBBinaryArchitectureArm = @"arm";
-FBBinaryArchitecture const FBBinaryArchitectureArm64 = @"arm64";
-
-static inline FBBinaryArchitecture ArchitectureForCPUType(cpu_type_t cpuType)
+static inline NSString *ArchitectureForCPUType(cpu_type_t cpuType)
 {
   NSDictionary *lookup = @{
-    @(CPU_TYPE_I386) : FBBinaryArchitecturei386,
-    @(CPU_TYPE_X86_64) : FBBinaryArchitecturex86_64,
-    @(CPU_TYPE_ARM) : FBBinaryArchitectureArm,
-    @(CPU_TYPE_ARM64) : FBBinaryArchitectureArm64,
+    @(CPU_TYPE_I386) : @"i386",
+    @(CPU_TYPE_X86_64) : @"x86_64",
+    @(CPU_TYPE_ARM) : @"arm" ,
+    @(CPU_TYPE_ARM64) : @"arm64"
   };
   return lookup[@(cpuType)];
 }
@@ -166,7 +163,7 @@ static inline NSArray *ReadArchs(FILE *file, uint32_t magic)
 
 @implementation FBBinaryParser
 
-+ (NSSet<FBBinaryArchitecture> *)architecturesForBinaryAtPath:(NSString *)binaryPath error:(NSError **)error
++ (NSSet<NSString *> *)architecturesForBinaryAtPath:(NSString *)binaryPath error:(NSError **)error
 {
   FILE *file = fopen(binaryPath.UTF8String, "rb");
   if (file == NULL) {

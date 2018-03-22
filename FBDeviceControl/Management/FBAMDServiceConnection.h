@@ -13,8 +13,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class FBServiceConnectionClient;
-
 @protocol FBControlCoreLogger;
 
 /**
@@ -60,20 +58,12 @@ typedef CFTypeRef AMDServiceConnectionRef;
  */
 - (BOOL)invalidateWithError:(NSError **)error;
 
-/**
- Build a service connection client, returning it in an FBFutureContext.
-
- @param logger the logger to use.
- @return an FBFutureContext wrapping the client.
- */
-- (FBFutureContext<FBServiceConnectionClient *> *)makeClientWithLogger:(id<FBControlCoreLogger>)logger;
-
 #pragma mark Properties
 
 /**
  The Wrapped Connection.
  */
-@property (nonatomic, assign, readonly, nullable) AMDServiceConnectionRef connection;
+@property (nonatomic, assign, readonly) AMDServiceConnectionRef connection;
 
 /**
  The Device to use.

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestBaseRunner.h"
@@ -52,16 +54,17 @@
 
 - (FBFuture<NSNull *> *)execute
 {
-  FBFuture<NSNull *> *future = [self.commandLine.destination isKindOfClass:FBXCTestDestinationiPhoneSimulator.class] ? [self runiOSTest] : [self runMacTest];
-  return [[future
-    timeout:self.commandLine.globalTimeout waitingFor:@"entire test execution to finish"]
-    onQueue:dispatch_get_main_queue() fmap:^ FBFuture<NSNull *> * (id _) {
-      NSError *error = nil;
-      if (![self.context.reporter printReportWithError:&error]) {
-        return [FBFuture futureWithError:error];
-      }
-      return FBFuture.empty;
-    }];
+  FBFuture<NSNull *> *testExecutingFuture = [self.commandLine.destination isKindOfClass:FBXCTestDestinationiPhoneSimulator.class] ? [self runiOSTest] : [self runMacTest];
+  return [[testExecutingFuture
+          timeout:self.commandLine.globalTimeout waitingFor:@"entire test execution to finish"]
+          onQueue:dispatch_get_main_queue()
+          chain:^FBFuture * _Nonnull(FBFuture * _Nonnull aFuture) {
+            NSError *error = nil;
+            if (![self.context.reporter printReportWithError:&error]) {
+              return [FBFuture futureWithError:error];
+            }
+            return aFuture;
+          }];
 }
 
 #pragma mark Private

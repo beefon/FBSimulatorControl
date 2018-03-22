@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorKeychainCommands.h"
@@ -42,12 +44,12 @@ static NSString *const SecuritydServiceName = @"com.apple.securityd";
 
 - (FBFuture<NSNull *> *)clearKeychain
 {
-  FBFuture<NSNull *> *stopServiceFuture = FBFuture.empty;
+  FBFuture<NSNull *> *stopServiceFuture = [FBFuture futureWithResult:NSNull.null];
   if (self.simulator.state == FBiOSTargetStateBooted) {
     stopServiceFuture = [[self.simulator stopServiceWithName:SecuritydServiceName] mapReplace:NSNull.null];
   }
   return [stopServiceFuture
-    onQueue:self.simulator.workQueue fmap:^ FBFuture<NSNull *> * (id _) {
+    onQueue:self.simulator.workQueue fmap:^(id _) {
       NSError *error = nil;
       if (![self removeKeychainDirectory:&error]) {
         return [FBFuture futureWithError:error];
@@ -55,7 +57,7 @@ static NSString *const SecuritydServiceName = @"com.apple.securityd";
       if (self.simulator.state == FBiOSTargetStateBooted) {
         return [[self.simulator startServiceWithName:SecuritydServiceName] mapReplace:NSNull.null];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 

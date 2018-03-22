@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestManagerResult.h"
@@ -26,7 +28,7 @@
   return nil;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)crashDiagnostic
 {
   return nil;
 }
@@ -53,7 +55,7 @@
   return nil;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)crashDiagnostic
 {
   return nil;
 }
@@ -95,7 +97,7 @@
     build];
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)crashDiagnostic
 {
   return nil;
 }
@@ -108,21 +110,19 @@
 @end
 
 @interface FBTestManagerResult_TestHostCrashed : FBTestManagerResult
-
-@property (nonatomic, strong, readonly) FBCrashLogInfo *underlyingCrash;
-
+@property (nonatomic, strong, readonly) FBDiagnostic *underlyingCrashDiagnostic;
 @end
 
 @implementation FBTestManagerResult_TestHostCrashed
 
-- (instancetype)initWithCrashDiagnostic:(FBCrashLogInfo *)crash
+- (instancetype)initWithCrashDiagnostic:(FBDiagnostic *)crashDiagnostic
 {
   self = [super init];
   if (!self) {
     return nil;
   }
 
-  _underlyingCrash = crash;
+  _underlyingCrashDiagnostic = crashDiagnostic;
 
   return self;
 }
@@ -135,13 +135,13 @@
 - (NSError *)error
 {
   return [[XCTestBootstrapError
-    describeFormat:@"The Test Host Crashed: %@", self.underlyingCrash]
+    describeFormat:@"The Test Host Crashed: %@", self.underlyingCrashDiagnostic]
     build];
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)crashDiagnostic
 {
-  return self.underlyingCrash;
+  return self.underlyingCrashDiagnostic;
 }
 
 - (NSString *)description
@@ -179,7 +179,7 @@
   return self.underlyingError;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)crashDiagnostic
 {
   return nil;
 }
@@ -213,8 +213,8 @@
 + (instancetype)bundleConnectionFailed:(FBTestBundleResult *)bundleResult
 {
   NSParameterAssert(bundleResult.didEndSuccessfully == NO);
-  if (bundleResult.crash) {
-    return [[FBTestManagerResult_TestHostCrashed alloc] initWithCrashDiagnostic:bundleResult.crash];
+  if (bundleResult.diagnostic) {
+    return [[FBTestManagerResult_TestHostCrashed alloc] initWithCrashDiagnostic:bundleResult.diagnostic];
   }
   NSParameterAssert(bundleResult.error);
   return [[FBTestManagerResult_InternalError alloc] initWithError:bundleResult.error];
@@ -246,7 +246,7 @@
   return nil;
 }
 
-- (FBCrashLogInfo *)crash
+- (FBDiagnostic *)crashDiagnostic
 {
   NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
   return nil;
