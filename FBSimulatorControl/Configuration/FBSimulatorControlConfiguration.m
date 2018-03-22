@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorControlConfiguration.h"
@@ -34,12 +36,12 @@
 
 #pragma mark Initializers
 
-+ (instancetype)configurationWithDeviceSetPath:(NSString *)deviceSetPath options:(FBSimulatorManagementOptions)options logger:(id<FBControlCoreLogger>)logger reporter:(id<FBEventReporter>)reporter
++ (instancetype)configurationWithDeviceSetPath:(NSString *)deviceSetPath options:(FBSimulatorManagementOptions)options
 {
-  return [[self alloc] initWithDeviceSetPath:deviceSetPath options:options logger:(logger ?: FBControlCoreGlobalConfiguration.defaultLogger) reporter:reporter];
+  return [[self alloc] initWithDeviceSetPath:deviceSetPath options:options];
 }
 
-- (instancetype)initWithDeviceSetPath:(NSString *)deviceSetPath options:(FBSimulatorManagementOptions)options logger:(id<FBControlCoreLogger>)logger reporter:(id<FBEventReporter>)reporter
+- (instancetype)initWithDeviceSetPath:(NSString *)deviceSetPath options:(FBSimulatorManagementOptions)options
 {
   self = [super init];
   if (!self) {
@@ -48,8 +50,6 @@
 
   _deviceSetPath = deviceSetPath;
   _options = options;
-  _logger = logger;
-  _reporter = reporter;
 
   return self;
 }
@@ -58,7 +58,9 @@
 
 - (instancetype)copyWithZone:(NSZone *)zone
 {
-  return self;
+  return [self.class
+    configurationWithDeviceSetPath:self.deviceSetPath
+    options:self.options];
 }
 
 #pragma mark NSObject

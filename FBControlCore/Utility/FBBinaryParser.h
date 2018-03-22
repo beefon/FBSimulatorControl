@@ -1,20 +1,15 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
-
-typedef NSString *FBBinaryArchitecture NS_STRING_ENUM;
-
-extern FBBinaryArchitecture const FBBinaryArchitecturei386;
-extern FBBinaryArchitecture const FBBinaryArchitecturex86_64;
-extern FBBinaryArchitecture const FBBinaryArchitectureArm;
-extern FBBinaryArchitecture const FBBinaryArchitectureArm64;
 
 /**
  Parsers the Mach-O Header of a binary.
@@ -28,7 +23,7 @@ extern FBBinaryArchitecture const FBBinaryArchitectureArm64;
  @param error an error out for any error that occurred.
  @return a Set of archs if any could be found, nil on error.
  */
-+ (nullable NSSet<FBBinaryArchitecture> *)architecturesForBinaryAtPath:(NSString *)binaryPath error:(NSError **)error;
++ (nullable NSSet<NSString *> *)architecturesForBinaryAtPath:(NSString *)binaryPath error:(NSError **)error;
 
 @end
 

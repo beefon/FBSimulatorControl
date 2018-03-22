@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorTestPreparationStrategy.h"
@@ -59,7 +61,7 @@
   NSAssert(self.testLaunchConfiguration.testBundlePath, @"Path to test bundle is needed to load bundles");
 
   // Check the bundle is codesigned (if required).
-  if (FBControlCoreGlobalConfiguration.confirmCodesignaturesAreValid) {
+  if (FBXcodeConfiguration.isXcode8OrGreater && FBControlCoreGlobalConfiguration.confirmCodesignaturesAreValid) {
     return [[[self.codesign
       cdHashForBundleAtPath:self.testLaunchConfiguration.testBundlePath]
       rephraseFailure:@"Could not determine bundle at path '%@' is codesigned and codesigning is required", self.testLaunchConfiguration.testBundlePath]
@@ -98,7 +100,7 @@
   // Prepare XCTest bundle
   NSError *error;
   NSUUID *sessionIdentifier = [NSUUID UUID];
-  FBTestBundle *testBundle = [[[[[[[[[[[FBTestBundleBuilder builderWithFileManager:self.fileManager]
+  FBTestBundle *testBundle = [[[[[[[[[[[[FBTestBundleBuilder builderWithFileManager:self.fileManager]
     withBundlePath:self.testLaunchConfiguration.testBundlePath]
     withUITesting:self.testLaunchConfiguration.shouldInitializeUITesting]
     withTestsToSkip:self.testLaunchConfiguration.testsToSkip]
@@ -107,6 +109,7 @@
     withSessionIdentifier:sessionIdentifier]
     withTargetApplicationPath:self.testLaunchConfiguration.targetApplicationPath]
     withTargetApplicationBundleID:self.testLaunchConfiguration.targetApplicationBundleID]
+    withTestApplicationDependencies:self.testLaunchConfiguration.testApplicationDependencies]
     withAutomationFrameworkPath:automationFrameworkPath]
     buildWithError:&error];
   if (!testBundle) {

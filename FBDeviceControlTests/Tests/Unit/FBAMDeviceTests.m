@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -159,7 +161,7 @@ static NSMutableArray<NSString *> *sEvents;
 - (void)testConnectToDeviceWithSuccess
 {
   FBFuture<NSNull *> *future = [[self.device connectToDeviceWithPurpose:@"test"] onQueue:dispatch_get_main_queue() pop:^(FBAMDevice *result) {
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }];
 
   NSError *error = nil;
@@ -297,7 +299,7 @@ static NSMutableArray<NSString *> *sEvents;
   ];
   XCTAssertEqualObjects(expected, actual);
 
-  [[FBFuture futureWithDelay:0.5 future:FBFuture.empty] await:nil];
+  [[FBFuture futureWithDelay:0.5 future:[FBFuture futureWithResult:NSNull.null]] await:nil];
   actual = [FBAMDeviceTests.events copy];
   expected = @[
     @"connect",

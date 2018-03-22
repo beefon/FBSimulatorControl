@@ -1,18 +1,21 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
 
 #import "FBSimulatorControlTestCase.h"
 
-NS_ASSUME_NONNULL_BEGIN
-
 @class FBSimulator;
 @class FBSimulatorControl;
+@class FBSimulatorPool;
+
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  FBSimulatorControl Assertion Helpers.
@@ -87,7 +90,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param application the Application to install.
  @return a Simulator if succesful, nil otherwise.
  */
-- (nullable FBSimulator *)assertObtainsBootedSimulatorWithInstalledApplication:(FBBundleDescriptor *)application;
+- (nullable FBSimulator *)assertObtainsBootedSimulatorWithInstalledApplication:(FBApplicationBundle *)application;
 
 /**
  Asserts that a booted Simulator with the provided configurations can be obtained.
@@ -105,7 +108,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param application the Application to install.
  @return a Simulator if successful, nil otherwise.
  */
-- (nullable FBSimulator *)assertSimulator:(FBSimulator *)simulator installs:(FBBundleDescriptor *)application;
+- (nullable FBSimulator *)assertSimulator:(FBSimulator *)simulator installs:(FBApplicationBundle *)application;
 
 /**
  An Assertion for Launching the Application with the given configuration.

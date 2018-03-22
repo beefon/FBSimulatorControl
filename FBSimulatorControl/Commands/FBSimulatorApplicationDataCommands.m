@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorApplicationDataCommands.h"
@@ -48,7 +50,7 @@
 {
   return [[self
     dataContainerPathForBundleID:bundleID]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSString *dataContainer) {
+    onQueue:self.simulator.asyncQueue fmap:^(NSString *dataContainer) {
       NSError *error;
       NSURL *basePathURL =  [NSURL fileURLWithPathComponents:@[dataContainer, containerPath]];
       NSFileManager *fileManager = NSFileManager.defaultManager;
@@ -61,7 +63,7 @@
             failFuture];
         }
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -70,16 +72,16 @@
   __block NSString *dstPath = destinationPath;
   return [[self
     dataContainerPathForBundleID:bundleID]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSString *dataContainer) {
+    onQueue:self.simulator.asyncQueue fmap:^(NSString *dataContainer) {
       NSString *source = [dataContainer stringByAppendingPathComponent:containerPath];
       BOOL srcIsDirecory = NO;
       if ([NSFileManager.defaultManager fileExistsAtPath:source isDirectory:&srcIsDirecory] && !srcIsDirecory) {
         NSError *createDirectoryError;
         if (![NSFileManager.defaultManager createDirectoryAtPath:dstPath withIntermediateDirectories:YES attributes:nil error:&createDirectoryError]) {
           return [[[FBSimulatorError
-            describeFormat:@"Could not create temporary directory"]
-            causedBy:createDirectoryError]
-            failFuture];
+                    describeFormat:@"Could not create temporary directory"]
+                   causedBy:createDirectoryError]
+                  failFuture];
         }
         dstPath = [dstPath stringByAppendingPathComponent:[source lastPathComponent]];
       }
@@ -101,7 +103,7 @@
           causedBy:copyError]
           failFuture];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -109,7 +111,7 @@
 {
   return [[self
     dataContainerPathForBundleID:bundleID]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSString *dataContainer) {
+    onQueue:self.simulator.asyncQueue fmap:^(NSString *dataContainer) {
       NSError *error;
       NSString *fullPath = [dataContainer stringByAppendingPathComponent:directoryPath];
       if (![NSFileManager.defaultManager createDirectoryAtPath:fullPath withIntermediateDirectories:YES attributes:nil error:&error]) {
@@ -118,46 +120,42 @@
           causedBy:error]
           failFuture];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
-- (FBFuture<NSNull *> *)movePaths:(NSArray<NSString *> *)originPaths toPath:(NSString *)destinationPath inContainerOfApplication:(NSString *)bundleID
+- (FBFuture<NSNull *> *)movePath:(NSString *)originPath toPath:(NSString *)destinationPath inContainerOfApplication:(NSString *)bundleID
 {
   return [[self
     dataContainerPathForBundleID:bundleID]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSString *dataContainer) {
+    onQueue:self.simulator.asyncQueue fmap:^(NSString *dataContainer) {
       NSError *error;
+      NSString *fullOriginPath = [dataContainer stringByAppendingPathComponent:originPath];
       NSString *fullDestinationPath = [dataContainer stringByAppendingPathComponent:destinationPath];
-      for (NSString *originPath in originPaths) {
-        NSString *fullOriginPath = [dataContainer stringByAppendingPathComponent:originPath];
-        if (![NSFileManager.defaultManager moveItemAtPath:fullOriginPath toPath:fullDestinationPath error:&error]) {
-          return [[[FBSimulatorError
-            describeFormat:@"Could not move item at %@ to %@", fullOriginPath, fullDestinationPath]
-            causedBy:error]
-            failFuture];
-        }
+      if (![NSFileManager.defaultManager moveItemAtPath:fullOriginPath toPath:fullDestinationPath error:&error]) {
+        return [[[FBSimulatorError
+          describeFormat:@"Could not move item at %@ to %@", fullOriginPath, fullDestinationPath]
+          causedBy:error]
+          failFuture];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
-- (FBFuture<NSNull *> *)removePaths:(NSArray<NSString *> *)paths inContainerOfApplication:(NSString *)bundleID
+- (FBFuture<NSNull *> *)removePath:(NSString *)path inContainerOfApplication:(NSString *)bundleID
 {
   return [[self
     dataContainerPathForBundleID:bundleID]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSString *dataContainer) {
+    onQueue:self.simulator.asyncQueue fmap:^(NSString *dataContainer) {
+      NSString *fullPath = [dataContainer stringByAppendingPathComponent:path];
       NSError *error;
-      for (NSString *path in paths) {
-        NSString *fullPath = [dataContainer stringByAppendingPathComponent:path];
-        if (![NSFileManager.defaultManager removeItemAtPath:fullPath error:&error]) {
-          return [[[FBSimulatorError
-            describeFormat:@"Could not remove item at path %@", fullPath]
-            causedBy:error]
-            failFuture];
-        }
+      if (![NSFileManager.defaultManager removeItemAtPath:fullPath error:&error]) {
+        return [[[FBSimulatorError
+          describeFormat:@"Could not remove item at path %@", fullPath]
+          causedBy:error]
+          failFuture];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBiOSTarget.h"
@@ -70,7 +72,7 @@ NSArray<NSString *> *FBiOSTargetTypeStringsFromTargetType(FBiOSTargetType target
   return [strings copy];
 }
 
-FBiOSTargetType FBiOSTargetTypeFromTargetTypeStrings(NSArray<NSString *> *targetTypeStrings)
+extern FBiOSTargetType FBiOSTargetTypeFromTargetTypeStrings(NSArray<NSString *> *targetTypeStrings)
 {
   FBiOSTargetType targetType = FBiOSTargetTypeNone;
   for (NSString *string in targetTypeStrings) {
@@ -89,7 +91,7 @@ FBiOSTargetType FBiOSTargetTypeFromTargetTypeStrings(NSArray<NSString *> *target
   return targetType;
 }
 
-NSComparisonResult FBiOSTargetComparison(id<FBiOSTarget> left, id<FBiOSTarget> right)
+extern NSComparisonResult FBiOSTargetComparison(id<FBiOSTarget> left, id<FBiOSTarget> right)
 {
   NSComparisonResult comparison = [@(left.targetType) compare:@(right.targetType)];
   if (comparison != NSOrderedSame) {

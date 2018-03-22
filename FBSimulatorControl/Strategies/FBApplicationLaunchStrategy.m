@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBApplicationLaunchStrategy.h"
@@ -66,17 +68,32 @@
 - (FBFuture<FBSimulatorApplicationOperation *> *)launchApplication:(FBApplicationLaunchConfiguration *)appLaunch
 {
   FBSimulator *simulator = self.simulator;
-  return [[[[FBFuture futureWithFutures:@[
-      [self ensureApplicationIsInstalled:appLaunch.bundleID],
-      [self confirmApplicationLaunchState:appLaunch.bundleID launchMode:appLaunch.launchMode],
-    ]]
+  return [[[[[[[simulator
+    installedApplicationWithBundleID:appLaunch.bundleID]
+    rephraseFailure:@"App %@ can't be launched as it isn't installed", appLaunch.bundleID]
     onQueue:simulator.workQueue fmap:^(id _) {
-      return [appLaunch.output createIOForTarget:simulator];
+      return [self.simulator runningApplicationWithBundleID:appLaunch.bundleID];
     }]
-    onQueue:simulator.workQueue fmap:^(FBProcessIO *io) {
+    onQueue:simulator.workQueue chain:^FBFuture<NSNull *> *(FBFuture<FBProcessInfo *> *processFuture) {
+      FBProcessInfo *process = processFuture.result;
+      if (process) {
+        if (appLaunch.launchMode == FBApplicationLaunchModeFailIfRunning) {
+          return [[FBSimulatorError
+                   describeFormat:@"App %@ can't be launched as is running (%@)", appLaunch.bundleID, process.shortDescription]
+                  failFuture];
+        } else if (appLaunch.launchMode == FBApplicationLaunchModeRelaunchIfRunning) {
+          return [[FBSimulatorSubprocessTerminationStrategy strategyWithSimulator:simulator] terminate:process];
+        }
+      }
+      return [FBFuture futureWithResult:NSNull.null];
+    }]
+    onQueue:simulator.workQueue fmap:^(id _) {
+      return [appLaunch createOutputForSimulator:simulator];
+    }]
+    onQueue:simulator.workQueue fmap:^(NSArray<FBProcessOutput *> *outputs) {
       return [FBFuture futureWithFutures:@[
-          [io.stdOut providedThroughFile],
-          [io.stdErr providedThroughFile],
+          [outputs[0] providedThroughFile],
+          [outputs[1] providedThroughFile],
       ]];
     }]
     onQueue:simulator.workQueue fmap:^ FBFuture<FBSimulatorApplicationOperation *> * (NSArray<id<FBProcessFileOutput>> *outputs) {
@@ -89,37 +106,6 @@
 }
 
 #pragma mark Private
-
-- (FBFuture<NSNumber *> *)ensureApplicationIsInstalled:(NSString *)bundleID
-{
-  return [[[self.simulator
-    installedApplicationWithBundleID:bundleID]
-    mapReplace:NSNull.null]
-    rephraseFailure:@"App %@ can't be launched as it isn't installed", bundleID];
-}
-
-- (FBFuture<NSNumber *> *)confirmApplicationLaunchState:(NSString *)bundleID launchMode:(FBApplicationLaunchMode)launchMode
-{
-  FBSimulator *simulator = self.simulator;
-  return [[simulator
-    runningApplicationWithBundleID:bundleID]
-    onQueue:simulator.asyncQueue chain:^FBFuture<NSNull *> *(FBFuture<FBProcessInfo *> *processFuture) {
-      FBProcessInfo *process = processFuture.result;
-      if (!process) {
-        return FBFuture.empty;
-      }
-      if (launchMode == FBApplicationLaunchModeFailIfRunning) {
-        return [[FBSimulatorError
-          describeFormat:@"App %@ can't be launched as is running (%@)", bundleID, process.shortDescription]
-          failFuture];
-      } else if (launchMode == FBApplicationLaunchModeRelaunchIfRunning) {
-        return [[FBSimulatorSubprocessTerminationStrategy
-          strategyWithSimulator:simulator]
-          terminate:process];
-      }
-      return FBFuture.empty;
-  }];
-}
 
 - (FBFuture<NSNumber *> *)launchApplication:(FBApplicationLaunchConfiguration *)appLaunch stdOut:(id<FBProcessFileOutput>)stdOut stdErr:(id<FBProcessFileOutput>)stdErr
 {

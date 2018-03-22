@@ -1,14 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBMacTestPreparationStrategy.h"
 
 #import <FBControlCore/FBControlCore.h>
 
+#import "FBDeviceOperator.h"
 #import "FBProductBundle.h"
 #import "FBTestBundle.h"
 #import "FBTestConfiguration.h"
@@ -115,7 +118,7 @@
   // Prepare XCTest bundle
   NSError *error;
   NSUUID *sessionIdentifier = [NSUUID UUID];
-  FBTestBundle *testBundle = [[[[[[[[[[[FBTestBundleBuilder builderWithFileManager:self.fileManager]
+  FBTestBundle *testBundle = [[[[[[[[[[[[FBTestBundleBuilder builderWithFileManager:self.fileManager]
     withBundlePath:self.testLaunchConfiguration.testBundlePath]
     withUITesting:self.testLaunchConfiguration.shouldInitializeUITesting]
     withTestsToSkip:self.testLaunchConfiguration.testsToSkip]
@@ -124,6 +127,7 @@
     withSessionIdentifier:sessionIdentifier]
     withTargetApplicationPath:self.testLaunchConfiguration.targetApplicationPath]
     withTargetApplicationBundleID:self.testLaunchConfiguration.targetApplicationBundleID]
+    withTestApplicationDependencies:self.testLaunchConfiguration.testApplicationDependencies]
     withAutomationFrameworkPath:automationFrameworkPath]
     buildWithError:&error];
 

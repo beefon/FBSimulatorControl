@@ -1,23 +1,29 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 #import <FBControlCore/FBControlCore.h>
+#import <XCTestBootstrap/XCTestBootstrap.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class FBDeviceSet;
+@class FBProductBundle;
+@class FBTestRunnerConfiguration;
+@protocol FBDeviceOperator;
 @protocol FBControlCoreLogger;
 
 /**
  A class that represents an iOS Device.
  */
-@interface FBDevice : NSObject <FBiOSTarget>
+@interface FBDevice : NSObject <FBiOSTarget, FBDebuggerCommands>
 
 /**
  The Device Set to which the Device Belongs.

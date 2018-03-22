@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -48,13 +50,14 @@
 {
   id testConfigurationMock = [OCMockObject niceMockForClass:FBTestRunnerConfiguration.class];
   OCMockObject<FBXCTestPreparationStrategy> *prepareTestMock = [OCMockObject mockForProtocol:@protocol(FBXCTestPreparationStrategy)];
+  OCMockObject<FBDeviceOperator> *deviceOperatorMock = [OCMockObject niceMockForProtocol:@protocol(FBDeviceOperator)];
+  [[[deviceOperatorMock stub] andReturn:[FBFuture futureWithResult:@13]] processIDWithBundleID:[OCMArg any]];
 
   [[[prepareTestMock expect] andReturn:[FBFuture futureWithResult:testConfigurationMock]] prepareTestWithIOSTarget:[OCMArg any]];
   OCMockObject *iOSTarget = [OCMockObject niceMockForProtocol:@protocol(FBiOSTarget)];
   [[[iOSTarget stub] andReturn:dispatch_get_main_queue()] workQueue];
-  [[[iOSTarget stub] andReturn:[FBFuture futureWithResult:@13]] processIDWithBundleID:OCMArg.any];
-  OCMockObject<FBLaunchedProcess> *processMock = [OCMockObject niceMockForProtocol:@protocol(FBLaunchedProcess)];
-  [(id<FBApplicationCommands>)[[iOSTarget stub] andReturn:[FBFuture futureWithResult:processMock]] launchApplication:[OCMArg any]];
+  [[[iOSTarget stub] andReturn:deviceOperatorMock] deviceOperator];
+  [(id<FBApplicationCommands>)[[iOSTarget stub] andReturn:[FBFuture futureWithResult:@YES]] launchApplication:[OCMArg any]];
 
   FBXCTestRunStrategy *strategy = [FBXCTestRunStrategy strategyWithIOSTarget:(id)iOSTarget testPrepareStrategy:prepareTestMock reporter:nil logger:nil];
   XCTAssertNoThrow([[strategy startTestManagerWithApplicationLaunchConfiguration:self.applicationLaunchConfiguration] await:nil]);
@@ -71,11 +74,13 @@
     waitForDebugger:NO
     output:FBProcessOutputConfiguration.outputToDevNull];
 
+  OCMockObject<FBDeviceOperator> *deviceOperatorMock = [OCMockObject niceMockForProtocol:@protocol(FBDeviceOperator)];
+  [[[deviceOperatorMock stub] andReturn:[FBFuture futureWithResult:@13]] processIDWithBundleID:[OCMArg any]];
+
   OCMockObject<FBiOSTarget> *iosTargetMock = [OCMockObject niceMockForProtocol:@protocol(FBiOSTarget)];
+  [[[iosTargetMock stub] andReturn:deviceOperatorMock] deviceOperator];
   [[[iosTargetMock stub] andReturn:dispatch_get_main_queue()] workQueue];
-  [[[iosTargetMock stub] andReturn:[FBFuture futureWithResult:@13]] processIDWithBundleID:OCMArg.any];
-  OCMockObject<FBLaunchedProcess> *processMock = [OCMockObject niceMockForProtocol:@protocol(FBLaunchedProcess)];
-  [(id<FBApplicationCommands>)[[iosTargetMock expect] andReturn:[FBFuture futureWithResult:processMock]] launchApplication:launchConfiguration];
+  [(id<FBApplicationCommands>)[[iosTargetMock expect] andReturn:[FBFuture futureWithResult:@YES]] launchApplication:launchConfiguration];
 
   id testRunnerMock = [OCMockObject niceMockForClass:FBProductBundle.class];
   [[[testRunnerMock stub] andReturn:@"com.bundle"] bundleID];

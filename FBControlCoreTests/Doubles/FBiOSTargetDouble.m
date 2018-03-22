@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBiOSTargetDouble.h"
@@ -10,6 +12,7 @@
 @implementation FBiOSTargetDouble
 
 @synthesize architecture;
+@synthesize deviceOperator;
 @synthesize logger;
 @synthesize screenInfo;
 
@@ -74,7 +77,7 @@
   return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
 }
 
-- (FBFuture<id<FBLaunchedProcess>> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration
+- (FBFuture<NSNumber *> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration
 {
   return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
 }
@@ -114,11 +117,6 @@
   return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
 }
 
-- (FBFuture<NSNumber *> *)processIDWithBundleID:(NSString *)bundleID
-{
-  return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
-}
-
 - (FBFuture<id<FBiOSTargetContinuation>> *)startTestWithLaunchConfiguration:(FBTestLaunchConfiguration *)testLaunchConfiguration reporter:(id<FBTestManagerTestReporter>)reporter logger:(id<FBControlCoreLogger>)logger
 {
   return nil;
@@ -132,11 +130,6 @@
 - (FBFuture<NSArray<NSString *> *> *)listTestsForBundleAtPath:(NSString *)bundlePath timeout:(NSTimeInterval)timeout
 {
   return nil;
-}
-
-- (FBFutureContext<NSNumber *> *)transportForTestManagerService
-{
-  return [FBFutureContext futureContextWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
 }
 
 - (FBFuture<NSArray<NSString *> *> *)logLinesWithArguments:(NSArray<NSString *> *)arguments
@@ -165,16 +158,6 @@
 }
 
 - (FBFuture<NSArray<FBCrashLogInfo *> *> *)pruneCrashes:(NSPredicate *)predicate
-{
-  return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
-}
-
-- (FBFuture<FBInstrumentsOperation *> *)startInstrument:(FBInstrumentsConfiguration *)configuration logger:(id<FBControlCoreLogger>)logger
-{
-  return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
-}
-
-- (nonnull FBFuture<id<FBDebugServer>> *)launchDebugServerForHostApplication:(nonnull FBBundleDescriptor *)application port:(in_port_t)port
 {
   return [FBFuture futureWithError:[[FBControlCoreError describe:@"Unimplemented"] build]];
 }

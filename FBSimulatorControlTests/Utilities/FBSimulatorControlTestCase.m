@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorControlTestCase.h"
@@ -49,9 +51,7 @@ static NSString *const RecordVideoEnvKey = @"FBSIMULATORCONTROL_RECORD_VIDEO";
   if (!_control) {
     FBSimulatorControlConfiguration *configuration = [FBSimulatorControlConfiguration
       configurationWithDeviceSetPath:self.deviceSetPath
-      options:self.managementOptions
-      logger:nil
-      reporter:nil];
+      options:self.managementOptions];
 
     NSError *error;
     FBSimulatorControl *control = [FBSimulatorControl withConfiguration:configuration error:&error];
@@ -121,6 +121,7 @@ static NSString *const RecordVideoEnvKey = @"FBSIMULATORCONTROL_RECORD_VIDEO";
 {
   self.continueAfterFailure = NO;
   self.managementOptions = FBSimulatorManagementOptionsKillSpuriousSimulatorsOnFirstStart | FBSimulatorManagementOptionsIgnoreSpuriousKillFail;
+  self.allocationOptions = FBSimulatorAllocationOptionsReuse | FBSimulatorAllocationOptionsCreate | FBSimulatorAllocationOptionsEraseOnAllocate;
   self.simulatorConfiguration = [FBSimulatorConfiguration withDeviceModel:FBDeviceModeliPhoneSE];
   self.bootConfiguration = FBSimulatorControlTestCase.defaultBootConfiguration;
   self.deviceSetPath = FBSimulatorControlTestCase.defaultDeviceSetPath;
@@ -128,7 +129,7 @@ static NSString *const RecordVideoEnvKey = @"FBSIMULATORCONTROL_RECORD_VIDEO";
 
 - (void)tearDown
 {
-  [[self.control.set killAll] await:nil];
+  [[self.control.pool.set killAll] await:nil];
   _control = nil;
 }
 

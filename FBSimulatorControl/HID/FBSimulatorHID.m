@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorHID.h"
@@ -142,7 +144,7 @@ static const char *SimulatorHIDClientClassName = "SimulatorKit.SimDeviceLegacyHI
         causedBy:innerError]
         failFuture];
     }
-    return [FBFuture futureWithResult:@(registrationPort)];
+    return [FBFuture futureWithResult:@(result)];
   }];
 }
 
@@ -289,10 +291,10 @@ static const char *SimulatorHIDClientClassName = "SimulatorKit.SimDeviceLegacyHI
       failFuture];
   }
   if (self.replyPort != 0) {
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
-  return [FBFuture onQueue:self.queue resolve:^ FBFuture<NSNull *> * {
+  return [FBFuture onQueue:self.queue resolve:^{
     // Attempt to perform the handshake.
     mach_msg_size_t size = 0x400;
     mach_msg_timeout_t timeout = ((unsigned int) FBControlCoreGlobalConfiguration.regularTimeout) * 1000;
@@ -302,7 +304,7 @@ static const char *SimulatorHIDClientClassName = "SimulatorKit.SimDeviceLegacyHI
     handshakeHeader->msgh_remote_port = 0;
     handshakeHeader->msgh_local_port = self.registrationPort;
 
-    kern_return_t result = mach_msg(handshakeHeader, MACH_RCV_LARGE | MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0x0, size, self.registrationPort, timeout, 0x0);
+    kern_return_t result = mach_msg(handshakeHeader, MACH_RCV_LARGE | MACH_RCV_MSG, 0x0, size, self.registrationPort, timeout, 0x0);
     if (result != KERN_SUCCESS) {
       free(handshakeHeader);
       return [[FBSimulatorError
@@ -312,7 +314,7 @@ static const char *SimulatorHIDClientClassName = "SimulatorKit.SimDeviceLegacyHI
     // We have the registration port, so we can now set it.
     self.replyPort = handshakeHeader->msgh_remote_port;
     free(handshakeHeader);
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }];
 }
 
@@ -359,7 +361,7 @@ static const char *SimulatorHIDClientClassName = "SimulatorKit.SimDeviceLegacyHI
       describeFormat:@"The mach_msg_send failed with error %d", result]
       failFuture];
   }
-  return FBFuture.empty;
+  return [FBFuture futureWithResult:NSNull.null];
 }
 
 @end
@@ -408,7 +410,7 @@ static const char *SimulatorHIDClientClassName = "SimulatorKit.SimDeviceLegacyHI
       describe:@"Cannot Connect, HID client has already been disposed of"]
       failFuture];
   }
-  return FBFuture.empty;
+  return [FBFuture futureWithResult:NSNull.null];
 }
 
 - (void)disconnect

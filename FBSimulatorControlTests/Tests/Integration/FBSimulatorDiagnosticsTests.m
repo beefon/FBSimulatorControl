@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -79,6 +81,27 @@
     }
     return combinedContent;
   }];
+}
+
+- (void)testCreateStdErrDiagnosticForSimulator
+{
+  FBSimulator *simulator = [self assertObtainsSimulator];
+  FBProcessOutputConfiguration *output = [FBProcessOutputConfiguration defaultOutputToFile];
+  FBApplicationLaunchConfiguration *appLaunch = [self.tableSearchAppLaunch withOutput:output];
+
+  NSError *error = nil;
+  FBDiagnostic *stdErrDiagnostic = [[appLaunch createStdErrDiagnosticForSimulator:simulator] await:&error];
+  XCTAssertNil(error);
+
+  FBDiagnostic *stdOutDiagnostic = [[appLaunch createStdOutDiagnosticForSimulator:simulator] await:&error];
+  XCTAssertNil(error);
+
+  XCTAssertNotNil(stdErrDiagnostic.asPath);
+  XCTAssertNotNil(stdOutDiagnostic.asPath);
+
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  XCTAssertTrue([fileManager fileExistsAtPath:stdErrDiagnostic.asPath]);
+  XCTAssertTrue([fileManager fileExistsAtPath:stdOutDiagnostic.asPath]);
 }
 
 @end

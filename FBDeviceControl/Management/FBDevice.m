@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBDevice.h"
@@ -23,6 +25,7 @@
 #import "FBDeviceSet+Private.h"
 #import "FBDeviceVideoRecordingCommands.h"
 #import "FBDeviceXCTestCommands.h"
+#import "FBiOSDeviceOperator.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wprotocol"
@@ -30,6 +33,7 @@
 
 @implementation FBDevice
 
+@synthesize deviceOperator = _deviceOperator;
 @synthesize logger = _logger;
 
 #pragma mark Initializers
@@ -183,6 +187,14 @@
 
 #pragma mark Properties
 
+- (id<FBDeviceOperator>)deviceOperator
+{
+  if (_deviceOperator == nil) {
+    _deviceOperator = [FBiOSDeviceOperator forDevice:self];
+  }
+  return _deviceOperator;
+}
+
 - (NSString *)modelName
 {
   return self.amDevice.modelName;
@@ -224,7 +236,6 @@
       FBDeviceScreenshotCommands.class,
       FBDeviceVideoRecordingCommands.class,
       FBDeviceXCTestCommands.class,
-      FBInstrumentsCommands.class,
     ];
   });
   return commandClasses;
@@ -242,6 +253,10 @@
   id command = [self.forwarder forwardingTargetForSelector:selector];
   if (command) {
     return command;
+  }
+  // Otherwise try the operator
+  if ([FBiOSDeviceOperator instancesRespondToSelector:selector]) {
+    return self.deviceOperator;
   }
   // Nothing left.
   return [super forwardingTargetForSelector:selector];

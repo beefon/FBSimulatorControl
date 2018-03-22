@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBBundleDescriptor.h"
@@ -10,17 +12,14 @@
 #import "FBBinaryDescriptor.h"
 #import "FBFileManager.h"
 #import "FBControlCoreError.h"
-#import "FBCollectionInformation.h"
 
 @implementation FBBundleDescriptor
 
-#pragma mark Initializers
-
-- (instancetype)initWithName:(NSString *)name identifier:(NSString *)identifier path:(NSString *)path binary:(nullable FBBinaryDescriptor *)binary
+- (instancetype)initWithName:(NSString *)name path:(NSString *)path bundleID:(NSString *)bundleID binary:(nullable FBBinaryDescriptor *)binary
 {
   NSParameterAssert(name);
   NSParameterAssert(path);
-  NSParameterAssert(identifier);
+  NSParameterAssert(bundleID);
 
   self = [super init];
   if (!self) {
@@ -28,59 +27,30 @@
   }
 
   _name = name;
-  _identifier = identifier;
   _path = path;
+  _bundleID = bundleID;
   _binary = binary;
 
   return self;
 }
 
-+ (instancetype)bundleFromPath:(NSString *)path error:(NSError **)error
++ (nullable instancetype)withName:(NSString *)name path:(NSString *)path bundleID:(NSString *)bundleID binary:(FBBinaryDescriptor *)binary
 {
-  return [self bundleFromPath:path fallbackIdentifier:NO error:error];
-}
-
-+ (instancetype)bundleWithFallbackIdentifierFromPath:(NSString *)path error:(NSError **)error
-{
-  return [self bundleFromPath:path fallbackIdentifier:YES error:error];
-}
-
-+ (instancetype)bundleFromPath:(NSString *)path fallbackIdentifier:(BOOL)fallbackIdentifier error:(NSError **)error
-{
-  if (!path) {
-    return [[FBControlCoreError
-      describe:@"Nil file path provided for bundle path"]
-      fail:error];
-  }
-  NSBundle *bundle = [NSBundle bundleWithPath:path];
-  if (!bundle) {
-    return [[FBControlCoreError
-      describeFormat:@"Failed to load bundle at path %@", path]
-      fail:error];
-  }
-  NSString *bundleName = [self bundleNameForBundle:bundle];
-  NSString *identifier = [bundle bundleIdentifier];
-  if (!identifier) {
-    if (!fallbackIdentifier) {
-      return [[FBControlCoreError
-        describeFormat:@"Could not obtain Bundle ID for bundle at path %@", path]
-        fail:error];
-    }
-    identifier = bundleName;
-  }
-  FBBinaryDescriptor *binary = [self binaryForBundle:bundle error:error];
-  if (!binary) {
+  if (!name || !path || !bundleID) {
     return nil;
   }
-  return [[self alloc] initWithName:bundleName identifier:identifier path:path binary:binary];
+  return [[self alloc] initWithName:name path:path bundleID:bundleID binary:binary];
 }
 
 #pragma mark NSCopying
 
 - (instancetype)copyWithZone:(NSZone *)zone
 {
-  // Is immutable
-  return self;
+  return [[self.class alloc]
+    initWithName:self.name
+    path:self.path
+    bundleID:self.bundleID
+    binary:self.binary];
 }
 
 #pragma mark NSObject
@@ -92,13 +62,13 @@
   }
   return [object.name isEqual:self.name] &&
          [object.path isEqual:self.path] &&
-         [object.identifier isEqual:self.identifier] &&
+         [object.bundleID isEqual:self.bundleID] &&
          [object.binary isEqual:self.binary];
 }
 
 - (NSUInteger)hash
 {
-  return self.name.hash | self.path.hash | self.identifier.hash | self.binary.hash;
+  return self.name.hash | self.path.hash | self.bundleID.hash | self.binary.hash;
 }
 
 #pragma mark FBDebugDescribeable
@@ -113,7 +83,7 @@
   return [NSString stringWithFormat:
     @"Name: %@ | ID: %@",
     self.name,
-    self.identifier
+    self.bundleID
   ];
 }
 
@@ -134,7 +104,7 @@
   NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
 
   result[@"name"] = self.name;
-  result[@"bundle_id"] = self.identifier;
+  result[@"bundle_id"] = self.bundleID;
   result[@"path"] = self.path;
   if (self.binary) {
     result[@"binary"] = self.binary.jsonSerializableRepresentation;
@@ -176,28 +146,19 @@
 
   return [[self.class alloc]
     initWithName:self.name
-    identifier:self.identifier
     path:targetBundlePath
+    bundleID:self.bundleID
     binary:self.binary];
 }
 
-#pragma mark Private
-
-+ (FBBinaryDescriptor *)binaryForBundle:(NSBundle *)bundle error:(NSError **)error
++ (BOOL)isApplicationAtPath:(NSString *)path
 {
-  NSString *binaryPath = [bundle executablePath];
-  if (!binaryPath) {
-    return [[FBControlCoreError
-      describeFormat:@"Could not obtain binary path for bundle %@", bundle.bundlePath]
-      fail:error];
-  }
-
-  return [FBBinaryDescriptor binaryWithPath:binaryPath error:error];
-}
-
-+ (NSString *)bundleNameForBundle:(NSBundle *)bundle
-{
-  return bundle.infoDictionary[@"CFBundleName"] ?: bundle.infoDictionary[@"CFBundleExecutable"] ?: bundle.bundlePath.stringByDeletingPathExtension.lastPathComponent;
+  BOOL isDirectory = NO;
+  BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory];
+    return path != nil
+        && [path hasSuffix:@".app"]
+        && exists
+        && isDirectory;
 }
 
 @end

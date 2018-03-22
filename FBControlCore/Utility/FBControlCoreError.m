@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBControlCoreError.h"
@@ -93,14 +95,6 @@ NSString *const FBControlCoreErrorDomain = @"com.facebook.FBControlCore";
     *error = [self build];
   }
   return NO;
-}
-
-- (int)failInt:(NSError **)error
-{
-  if (error) {
-    *error = [self build];
-  }
-  return 0;
 }
 
 - (unsigned int)failUInt:(NSError **)error
@@ -210,6 +204,7 @@ NSString *const FBControlCoreErrorDomain = @"com.facebook.FBControlCore";
   NSError *error = [NSError errorWithDomain:self.domain code:self.code userInfo:[userInfo copy]];
   if (self.logger.level >= FBControlCoreLogLevelDebug) {
     [self.logger.error logFormat:@"New Error Built ==> %@", error];
+    [self attemptToLogJSONRepresentationOfError:error usingLogger:self.logger.error];
   }
 
   return error;
@@ -244,6 +239,22 @@ NSString *const FBControlCoreErrorDomain = @"com.facebook.FBControlCore";
   NSMutableDictionary *userInfo = [cause.userInfo mutableCopy];
   userInfo[NSLocalizedDescriptionKey] = description;
   return [NSError errorWithDomain:cause.domain code:cause.code userInfo:[userInfo copy]];
+}
+
+- (void)attemptToLogJSONRepresentationOfError:(NSError *)error usingLogger:(id<FBControlCoreLogger>)logger
+{
+  NSDictionary *JSONObject =
+  @{
+    @"errorOrigin": NSStringFromClass(self.class),
+    @"domain": error.domain,
+    @"code": @(error.code),
+    @"text": error.localizedDescription ?: NSNull.null
+    };
+  if ([NSJSONSerialization isValidJSONObject:JSONObject]) {
+    NSData *JSONData = [NSJSONSerialization dataWithJSONObject:JSONObject options:0 error:NULL];
+    NSString *JSONString = [[NSString alloc] initWithData:JSONData encoding:NSUTF8StringEncoding];
+    if (JSONString != nil) { [logger log:JSONString]; }
+  }
 }
 
 @end

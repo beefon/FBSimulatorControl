@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -133,7 +135,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param duration the duration of the test case.
  @param logs the logs from the test case.
  */
-- (void)testCaseDidFinishForTestClass:(NSString *)testClass method:(NSString *)method withStatus:(FBTestReportStatus)status duration:(NSTimeInterval)duration logs:(nullable NSArray<NSString *> *)logs;
+- (void)testCaseDidFinishForTestClass:(NSString *)testClass method:(NSString *)method withStatus:(FBTestReportStatus)status duration:(NSTimeInterval)duration logs:(nullable NSArray *)logs;
 
 /**
  Called when the test plan fails for some global issue not specific to any one test
@@ -155,6 +157,13 @@ NS_ASSUME_NONNULL_BEGIN
  @param osLogPath the file path of os log
  */
 - (void)didSaveOSLogAtPath:(nonnull NSString *)osLogPath;
+
+/**
+ Called after saving runner app log during test run.
+ 
+ @param runnerLogPath the file path of runner logs
+ */
+- (void)didSaveRunnerAppLogAtPath:(nonnull NSString *)runnerLogPath;
 
 /**
  Called after copy a test artifacts out of simulator's folder.

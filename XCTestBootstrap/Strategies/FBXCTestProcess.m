@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestProcess.h"
@@ -90,7 +92,7 @@ static NSTimeInterval const SampleTimeoutSubtraction = SampleDuration + 1;
 + (FBFuture<NSNumber *> *)onQueue:(dispatch_queue_t)queue timeoutFuture:(NSTimeInterval)timeout processIdentifier:(pid_t)processIdentifier
 {
   return [[FBFuture
-    futureWithDelay:timeout future:FBFuture.empty]
+    futureWithDelay:timeout future:[FBFuture futureWithResult:NSNull.null]]
     onQueue:queue fmap:^(id _) {
       return [FBXCTestProcess onQueue:queue timeoutErrorWithTimeout:timeout processIdentifier:processIdentifier];
     }];
@@ -117,11 +119,11 @@ static NSTimeInterval const SampleTimeoutSubtraction = SampleDuration + 1;
   [logger logFormat:@"xctest process (%d) exited with code %d, checking for crash log for %f seconds", processIdentifier, exitCode, crashLogWaitTime];
   return [[[FBXCTestProcess
     onQueue:queue crashLogsForTerminationOfProcess:processIdentifier since:startDate notifier:notifier crashLogWaitTime:crashLogWaitTime]
-    rephraseFailure:@"xctest process (%d) exited abnormally (exit code %d) with no crash log, to check for yourself look in ~/Library/Logs/DiagnosticReports", processIdentifier, exitCode]
+    rephraseFailure:@"xctest process (%d) exited abnormally (exit code %d) with no crash log", processIdentifier, exitCode]
     onQueue:queue fmap:^(FBCrashLogInfo *crashInfo) {
-      NSString *crashString = [NSString stringWithContentsOfFile:crashInfo.crashPath encoding:NSUTF8StringEncoding error:nil];
+      FBDiagnostic *diagnosticCrash = [crashInfo toDiagnostic:FBDiagnosticBuilder.builder];
       return [[FBXCTestError
-        describeFormat:@"xctest process crashed\n %@", crashString]
+        describeFormat:@"xctest process crashed\n %@", diagnosticCrash.asString]
         failFuture];
     }];
 }

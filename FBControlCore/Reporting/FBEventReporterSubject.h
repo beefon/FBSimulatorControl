@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -23,41 +25,6 @@ NS_ASSUME_NONNULL_BEGIN
  An Array of all the composed Subjects.
  */
 @property (nonatomic, copy, readonly) NSArray<id<FBEventReporterSubject>> *subSubjects;
-
-/**
- The Event Name, if present
- */
-@property (nonatomic, copy, nullable, readonly) FBEventName eventName;
-
-/**
- The Event Type, if present
- */
-@property (nonatomic, copy, nullable, readonly) FBEventType eventType;
-
-/**
- A JSON Serializable form of the argument.
- */
-@property (nonatomic, copy, nullable, readonly) NSDictionary<NSString *, NSString *> *argument;
-
-/**
- A JSON Serializable form of the arguments
- */
-@property (nonatomic, copy, nullable, readonly) NSArray<NSString *> *arguments;
-
-/**
- A duration if present.
- */
-@property (nonatomic, copy, nullable, readonly) NSNumber *duration;
-
-/**
- A size, if present
- */
-@property (nonatomic, copy, nullable, readonly) NSNumber *size;
-
-/**
- A message, if present
- */
-@property (nonatomic, copy, nullable, readonly) NSString *message;
 
 @end
 
@@ -156,76 +123,6 @@ NS_ASSUME_NONNULL_BEGIN
  @return a Event Reporter Subject.
  */
 + (instancetype)compositeSubjectWithArray:(NSArray<id<FBEventReporterSubject>> *)subjects NS_SWIFT_NAME(init(subjects:));
-
-/**
- Construct a sample for logging an event.
-
- @param eventName the event name
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForEvent:(FBEventName)eventName;
-
-/**
- Construct a sample for a started call.
-
- @param call the name of the invoked call
- @param argument a key-value representation of the argument to the call.
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForStartedCall:(NSString *)call argument:(NSDictionary<NSString *, NSString *> *)argument;
-
-/**
- Construct a sample for a started call.
-
- @param call the name of the invoked call
- @param arguments the arguments to the invoked call
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForStartedCall:(NSString *)call arguments:(NSArray<NSString *> *)arguments;
-
-/**
- Construct a sample for a successful call.
-
- @param call the name of the invoked call
- @param duration the duration of the call.
- @param argument a key-value representation of the argument to the call.
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForSuccessfulCall:(NSString *)call duration:(NSTimeInterval)duration argument:(NSDictionary<NSString *, NSString *> *)argument;
-
-/**
- Construct a sample for a successful call.
-
- @param call the name of the invoked call.
- @param duration the duration of the call.
- @param size the size of a payload within a call.
- @param arguments the arguments to the invoked call.
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForSuccessfulCall:(NSString *)call duration:(NSTimeInterval)duration size:(nullable NSNumber *)size arguments:(NSArray<NSString *> *)arguments;
-
-/**
- Construct a sample for a failing call.
-
- @param call the name of the invoked call.
- @param duration the duration of the call.
- @param message the failure message.
- @param argument a key-value representation of the argument to the call.
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForFailingCall:(NSString *)call duration:(NSTimeInterval)duration message:(nullable NSString *)message argument:(NSDictionary<NSString *, NSString *> *)argument;
-
-/**
- Construct a sample for a failing call.
-
- @param call the name of the invoked call.
- @param duration the duration of the call.
- @param message the failure message.
- @param size the size of a payload within a call.
- @param arguments the arguments to the invoked call
- @return a scuba sample
- */
-+ (id<FBEventReporterSubject>)subjectForFailingCall:(NSString *)call duration:(NSTimeInterval)duration message:(NSString *)message size:(nullable NSNumber *)size arguments:(NSArray<NSString *> *)arguments;
 
 @end
 

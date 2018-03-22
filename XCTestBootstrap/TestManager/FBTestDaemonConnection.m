@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestDaemonConnection.h"
@@ -17,12 +19,14 @@
 #import <DTXConnectionServices/DTXProxyChannel.h>
 #import <DTXConnectionServices/DTXRemoteInvocationReceipt.h>
 #import <DTXConnectionServices/DTXTransport.h>
-#import <DTXConnectionServices/DTXSocketTransport.h>
+
+#import <IDEiOSSupportCore/DVTAbstractiOSDevice.h>
 
 #import <objc/runtime.h>
 
 #import "XCTestBootstrapError.h"
 #import "FBTestManagerAPIMediator.h"
+#import "FBDeviceOperator.h"
 #import "FBTestManagerContext.h"
 #import "FBTestDaemonResult.h"
 
@@ -40,7 +44,7 @@ static FBTestDaemonConnectionState const FBTestDaemonConnectionStateResultAvaila
 
 @interface FBTestDaemonConnection () <XCTestManager_IDEInterface>
 
-@property (nonatomic, strong, readonly) id<XCTestManager_IDEInterface, NSObject> interface;
+@property (nonatomic, weak, readonly) id<XCTestManager_IDEInterface, NSObject> interface;
 @property (nonatomic, strong, readonly) FBTestManagerContext *context;
 @property (nonatomic, strong, readonly) id<FBiOSTarget> target;
 @property (nonatomic, strong, readonly) dispatch_queue_t requestQueue;
@@ -184,12 +188,11 @@ static FBTestDaemonConnectionState const FBTestDaemonConnectionStateResultAvaila
   self.state = FBTestDaemonConnectionStateConnecting;
   [self.logger log:@"Starting the daemon connection"];
 
-  [[[self.target
-    transportForTestManagerService]
-    onQueue:self.requestQueue enter:^(NSNumber *socket, FBMutableFuture<NSNull *> *teardown){
-      DTXTransport *transport = [[objc_lookUpClass("DTXSocketTransport") alloc] initWithConnectedSocket:socket.intValue disconnectAction:^{
-        [teardown resolveWithResult:NSNull.null];
-      }];
+  [[[FBFuture
+    onQueue:self.requestQueue resolve:^{
+     return [self.target.deviceOperator makeTransportForTestManagerServiceWithLogger:self.logger];
+    }]
+    onQueue:self.requestQueue map:^(DTXTransport *transport){
       return [self createDaemonConnectionWithTransport:transport];
     }]
     onQueue:self.target.workQueue handleError:^(NSError *innerError) {

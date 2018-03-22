@@ -1,21 +1,24 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
 
 #import <FBSimulatorControl/FBSimulatorControlConfiguration.h>
-
-NS_ASSUME_NONNULL_BEGIN
+#import <FBSimulatorControl/FBSimulatorPool.h>
 
 @class FBSimulator;
 @class FBSimulatorBootConfiguration;
 @class FBSimulatorConfiguration;
 @class FBSimulatorControl;
 @class FBSimulatorControlNotificationAssertions;
+
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  Environment Keys and Values for how the Simulator should be launched.
@@ -40,6 +43,11 @@ extern NSString *const FBSimulatorControlTestsLaunchTypeDirect;
  The Per-TestCase Management Options for created FBSimulatorControl instances.
  */
 @property (nonatomic, assign, readwrite) FBSimulatorManagementOptions managementOptions;
+
+/**
+ The Per Test Case Allocation Options for created allocated Simulators/Sessions.
+ */
+@property (nonatomic, assign, readwrite) FBSimulatorAllocationOptions allocationOptions;
 
 /**
  A default Simulator Configuration.

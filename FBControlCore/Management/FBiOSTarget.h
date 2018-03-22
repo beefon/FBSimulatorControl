@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -12,8 +14,6 @@
 #import <FBControlCore/FBBitmapStreamingCommands.h>
 #import <FBControlCore/FBCrashLogCommands.h>
 #import <FBControlCore/FBDebugDescribeable.h>
-#import <FBControlCore/FBDebuggerCommands.h>
-#import <FBControlCore/FBInstrumentsCommands.h>
 #import <FBControlCore/FBJSONConversion.h>
 #import <FBControlCore/FBLogCommands.h>
 #import <FBControlCore/FBScreenshotCommands.h>
@@ -28,6 +28,7 @@ NS_ASSUME_NONNULL_BEGIN
 @class FBiOSActionRouter;
 @class FBiOSTargetDiagnostics;
 @class FBiOSTargetScreenInfo;
+@protocol FBDeviceOperator;
 @protocol FBControlCoreLogger;
 
 /**
@@ -68,7 +69,7 @@ extern FBiOSTargetStateString const FBiOSTargetStateStringUnknown;
 /**
  Common Properties of Devices & Simulators.
  */
-@protocol FBiOSTarget <NSObject, FBJSONSerializable, FBDebugDescribeable, FBApplicationCommands, FBBitmapStreamingCommands, FBCrashLogCommands, FBLogCommands, FBScreenshotCommands, FBVideoRecordingCommands, FBXCTestCommands, FBInstrumentsCommands, FBDebuggerCommands>
+@protocol FBiOSTarget <NSObject, FBJSONSerializable, FBDebugDescribeable, FBApplicationCommands, FBBitmapStreamingCommands, FBCrashLogCommands, FBLogCommands, FBScreenshotCommands, FBVideoRecordingCommands, FBXCTestCommands>
 
 /**
  The Target's Logger.
@@ -141,6 +142,11 @@ extern FBiOSTargetStateString const FBiOSTargetStateStringUnknown;
 @property (nonatomic, copy, nullable, readonly) FBProcessInfo *containerApplication;
 
 /**
+ Device operator used to control device. It provides API for XCTestBoostrap to interact with the device.
+ */
+@property (nonatomic, nullable, strong, readonly) id<FBDeviceOperator> deviceOperator;
+
+/**
  The Queue to serialize work on.
  This is a serial queue that should act as a lock for other tasks that will mutate the state of the target.
  Mutually Exclusive operations should use this queue.
@@ -163,9 +169,6 @@ extern FBiOSTargetStateString const FBiOSTargetStateStringUnknown;
 
 @end
 
-#if defined __cplusplus
-extern "C" {
-#endif
 /**
  The canonical string representation of the state enum.
  */
@@ -179,7 +182,7 @@ extern FBiOSTargetState FBiOSTargetStateFromStateString(FBiOSTargetStateString s
 /**
  The canonical string representations of the target type Option Set.
  */
-extern NSArray<NSString *> *FBiOSTargetTypeStringsFromTargetType(FBiOSTargetType targetType);
+NSArray<NSString *> *FBiOSTargetTypeStringsFromTargetType(FBiOSTargetType targetType);
 
 /**
  The canonical enum representation of the state string.
@@ -190,9 +193,5 @@ extern FBiOSTargetType FBiOSTargetTypeFromTargetTypeStrings(NSArray<NSString *> 
  A Default Comparison Function that can be called for different implementations of FBiOSTarget.
  */
 extern NSComparisonResult FBiOSTargetComparison(id<FBiOSTarget> left, id<FBiOSTarget> right);
-
-#if defined __cplusplus
-};
-#endif
 
 NS_ASSUME_NONNULL_END

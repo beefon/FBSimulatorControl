@@ -1,20 +1,20 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTaskBuilder.h"
 
 #import <FBControlCore/FBControlCore.h>
 
-#import "FBDataBuffer.h"
 #import "FBDataConsumer.h"
-#import "FBProcessIO.h"
-#import "FBProcessStream.h"
 #import "FBTask.h"
 #import "FBTaskConfiguration.h"
+#import "FBProcessStream.h"
 
 @interface FBTaskBuilder ()
 
@@ -25,7 +25,6 @@
 @property (nonatomic, strong, nullable, readwrite) FBProcessOutput *stdOut;
 @property (nonatomic, strong, nullable, readwrite) FBProcessOutput *stdErr;
 @property (nonatomic, strong, nullable, readwrite) FBProcessInput *stdIn;
-@property (nonatomic, strong, nullable, readwrite) id<FBControlCoreLogger> logger;
 
 @end
 
@@ -47,7 +46,6 @@
   _stdOut = [FBProcessOutput outputToStringBackedByMutableData:NSMutableData.data];
   _stdErr = [FBProcessOutput outputToStringBackedByMutableData:NSMutableData.data];
   _stdIn = nil;
-  _logger = [FBControlCoreGlobalConfiguration.defaultLogger withName:[NSString stringWithFormat:@"FBTask_%@", launchPath.lastPathComponent]];
 
   return self;
 }
@@ -103,27 +101,7 @@
   return self;
 }
 
-#pragma mark stdin
-
-- (instancetype)withStdIn:(FBProcessInput *)input
-{
-  self.stdIn = input;
-  return self;
-}
-
-- (instancetype)withStdInConnected
-{
-  self.stdIn = [FBProcessInput inputFromConsumer];
-  return self;
-}
-
-- (instancetype)withStdInFromData:(NSData *)data
-{
-  self.stdIn = [FBProcessInput inputFromData:data];
-  return self;
-}
-
-#pragma mark stdout
+#pragma mark Input/Output
 
 - (instancetype)withStdOutInMemoryAsData
 {
@@ -131,9 +109,21 @@
   return self;
 }
 
+- (instancetype)withStdErrInMemoryAsData
+{
+  self.stdErr = [FBProcessOutput outputToMutableData:NSMutableData.data];
+  return self;
+}
+
 - (instancetype)withStdOutInMemoryAsString
 {
   self.stdOut = [FBProcessOutput outputToStringBackedByMutableData:NSMutableData.data];
+  return self;
+}
+
+- (instancetype)withStdErrInMemoryAsString
+{
+  self.stdErr = [FBProcessOutput outputToStringBackedByMutableData:NSMutableData.data];
   return self;
 }
 
@@ -144,59 +134,16 @@
   return self;
 }
 
-- (instancetype)withStdOutToDevNull
-{
-  self.stdOut = nil;
-  return self;
-}
-
-- (instancetype)withStdOutToInputStream
-{
-  self.stdOut = [FBProcessOutput outputToInputStream];
-  return self;
-}
-
-- (instancetype)withStdOutConsumer:(id<FBDataConsumer>)consumer
-{
-  self.stdOut = [FBProcessOutput outputForDataConsumer:consumer];
-  return self;
-}
-
-- (instancetype)withStdOutLineReader:(void (^)(NSString *))reader
-{
-  return [self withStdOutConsumer:[FBBlockDataConsumer asynchronousLineConsumerWithBlock:reader]];
-}
-
-- (instancetype)withStdOutToLogger:(id<FBControlCoreLogger>)logger
-{
-  self.stdOut = [FBProcessOutput outputForLogger:logger];
-  return self;
-}
-
-- (instancetype)withStdOutToLoggerAndErrorMessage:(id<FBControlCoreLogger>)logger
-{
-  self.stdOut = [FBProcessOutput outputForDataConsumer:[FBDataBuffer accumulatingBufferWithCapacity:FBTaskOutputErrorMessageLength] logger:logger];
-  return self;
-}
-
-#pragma mark stderr
-
-- (instancetype)withStdErrInMemoryAsData
-{
-  self.stdErr = [FBProcessOutput outputToMutableData:NSMutableData.data];
-  return self;
-}
-
-- (instancetype)withStdErrInMemoryAsString
-{
-  self.stdErr = [FBProcessOutput outputToStringBackedByMutableData:NSMutableData.data];
-  return self;
-}
-
 - (instancetype)withStdErrPath:(NSString *)stdErrPath
 {
   NSParameterAssert(stdErrPath);
   self.stdErr = [FBProcessOutput outputForFilePath:stdErrPath];
+  return self;
+}
+
+- (instancetype)withStdOutToDevNull
+{
+  self.stdOut = nil;
   return self;
 }
 
@@ -206,15 +153,32 @@
   return self;
 }
 
+- (instancetype)withStdOutConsumer:(id<FBDataConsumer>)consumer
+{
+  self.stdOut = [FBProcessOutput outputForDataConsumer:consumer];
+  return self;
+}
+
 - (instancetype)withStdErrConsumer:(id<FBDataConsumer>)consumer
 {
   self.stdErr = [FBProcessOutput outputForDataConsumer:consumer];
   return self;
 }
 
+- (instancetype)withStdOutLineReader:(void (^)(NSString *))reader
+{
+  return [self withStdOutConsumer:[FBLineDataConsumer asynchronousReaderWithConsumer:reader]];
+}
+
 - (instancetype)withStdErrLineReader:(void (^)(NSString *))reader
 {
-  return [self withStdErrConsumer:[FBBlockDataConsumer asynchronousLineConsumerWithBlock:reader]];
+  return [self withStdErrConsumer:[FBLineDataConsumer asynchronousReaderWithConsumer:reader]];
+}
+
+- (instancetype)withStdOutToLogger:(id<FBControlCoreLogger>)logger
+{
+  self.stdOut = [FBProcessOutput outputForLogger:logger];
+  return self;
 }
 
 - (instancetype)withStdErrToLogger:(id<FBControlCoreLogger>)logger
@@ -223,23 +187,15 @@
   return self;
 }
 
-- (instancetype)withStdErrToLoggerAndErrorMessage:(id<FBControlCoreLogger>)logger
+- (instancetype)withStdInConnected
 {
-  self.stdErr = [FBProcessOutput outputForDataConsumer:[FBDataBuffer accumulatingBufferWithCapacity:FBTaskOutputErrorMessageLength] logger:logger];
+  self.stdIn = [FBProcessInput inputProducingConsumer];
   return self;
 }
 
-#pragma mark Loggers
-
-- (instancetype)withLoggingTo:(id<FBControlCoreLogger>)logger
+- (instancetype)withStdInFromData:(NSData *)data
 {
-  self.logger = logger;
-  return self;
-}
-
-- (instancetype)withNoLogging
-{
-  self.logger = nil;
+  self.stdIn = [FBProcessInput inputFromData:data];
   return self;
 }
 
@@ -268,8 +224,9 @@
     arguments:self.arguments
     environment:self.environment
     acceptableStatusCodes:self.acceptableStatusCodes
-    io:[[FBProcessIO alloc] initWithStdIn:self.stdIn stdOut:self.stdOut stdErr:self.stdErr]
-    logger:self.logger];
+    stdOut:self.stdOut
+    stdErr:self.stdErr
+    stdIn:self.stdIn];
 }
 
 + (NSDictionary<NSString *, NSString *> *)defaultEnvironmentForSubprocess

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -70,6 +72,11 @@ NS_ASSUME_NONNULL_BEGIN
  Path to the target application for UI tests
  */
 @property (nonatomic, copy, readonly, nullable) NSString *targetApplicationPath;
+
+/*
+ Path to an application by bundle id for UI tests
+ */
+@property(copy) NSDictionary<NSString *, NSString *> *testApplicationDependencies;
 
 /*
  A dictionary with xctestrun file contents to use.
@@ -142,6 +149,14 @@ NS_ASSUME_NONNULL_BEGIN
  @return new test launch configuration with changes applied.
  */
 - (instancetype)withTargetApplicationBundleID:(NSString *)targetApplicationBundleID;
+
+/**
+ Adds test application dependencies for UI tests.
+
+ @param testApplicationDependencies test application dependencies
+ @return builder
+ */
+- (instancetype)withTestApplicationDependencies:(NSDictionary<NSString *, NSString *> *)testApplicationDependencies;
 
 /**
  Adds xcTestRunProperties. When launching tests those properties will

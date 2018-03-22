@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBiOSTargetCommandForwarder.h"
@@ -51,16 +53,6 @@
 
 #pragma mark Forwarding
 
-- (BOOL)respondsToSelector:(SEL)selector
-{
-  for (Class class in self.commandClasses) {
-    if ([class instancesRespondToSelector:selector]) {
-      return YES;
-    }
-  }
-  return NO;
-}
-
 - (id)forwardingTargetForSelector:(SEL)selector
 {
   for (Class class in self.commandClasses) {
@@ -72,7 +64,7 @@
   return [super forwardingTargetForSelector:selector];
 }
 
-- (id<FBiOSTargetCommand>)obtainCommandForClass:(Class)class
+- (id)obtainCommandForClass:(Class)class
 {
   NSString *key = NSStringFromClass(class);
   if (self.memoizedCommands[key]){
@@ -86,7 +78,7 @@
   return instance;
 }
 
-- (id<FBiOSTargetCommand>)createCommandForClass:(Class)class
+- (id)createCommandForClass:(id)class
 {
   NSParameterAssert([class conformsToProtocol:@protocol(FBiOSTargetCommand)]);
   return [class commandsWithTarget:self.target];

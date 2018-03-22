@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorServiceContext.h"
@@ -26,47 +28,158 @@
 
 @interface FBSimulatorServiceContext ()
 
-@property (nonatomic, strong, readonly) SimServiceContext *serviceContext;
-@property (nonatomic, strong, nullable, readonly) id<FBControlCoreLogger> logger;
+@property (nonatomic, strong, readonly) FBSimulatorProcessFetcher *processFetcher;
 
-- (instancetype)initWithServiceContext:(SimServiceContext *)serviceContext;
+- (instancetype)initWithProcessFetcher:(FBSimulatorProcessFetcher *)processFetcher;
+
+- (SimDeviceSet *)createUnderlyingDeviceSet:(NSString *)deviceSetPath error:(NSError **)error;
+
+@end
+
+@interface FBSimulatorServiceContext_ContextBacked : FBSimulatorServiceContext
+
+@property (nonatomic, strong, readonly) SimServiceContext *serviceContext;
+
+- (instancetype)initWithProcessFetcher:(FBSimulatorProcessFetcher *)processFetcher serviceContext:(SimServiceContext *)serviceContext;
+
+@end
+
+@interface FBSimulatorServiceContext_Emulated : FBSimulatorServiceContext
 
 @end
 
 @implementation FBSimulatorServiceContext
 
-#pragma mark Initialization Public
+#pragma mark Initialization
 
 + (instancetype)sharedServiceContext
-{
-  return [self sharedServiceContextWithLogger:FBControlCoreGlobalConfiguration.defaultLogger];
-}
-
-+ (instancetype)sharedServiceContextWithLogger:(id<FBControlCoreLogger>)logger
 {
   static dispatch_once_t onceToken;
   static FBSimulatorServiceContext *serviceContext = nil;
   dispatch_once(&onceToken, ^{
-    serviceContext = [self createServiceContextWithLogger:logger];
+    serviceContext = [self createServiceContext];
   });
   return serviceContext;
 }
 
-#pragma mark Initialization Private
-
-+ (instancetype)createServiceContextWithLogger:(id<FBControlCoreLogger>)logger
++ (instancetype)createServiceContext
 {
+  FBSimulatorProcessFetcher *processFetcher = [FBSimulatorProcessFetcher fetcherWithProcessFetcher:[FBProcessFetcher new]];
+
   Class serviceContextClass = objc_lookUpClass("SimServiceContext");
-  NSAssert([serviceContextClass respondsToSelector:@selector(sharedServiceContextForDeveloperDir:error:)], @"Service Context cannot be instantiated");
-  NSError *innerError = nil;
-  SimServiceContext *serviceContext = [serviceContextClass sharedServiceContextForDeveloperDir:FBXcodeConfiguration.developerDirectory error:&innerError];
-  NSAssert(serviceContext, @"Could not create a service context with error %@", innerError);
-  return [[FBSimulatorServiceContext alloc] initWithServiceContext:serviceContext];
+  if ([serviceContextClass respondsToSelector:@selector(sharedServiceContextForDeveloperDir:error:)]) {
+    NSError *innerError = nil;
+    SimServiceContext *serviceContext = [serviceContextClass sharedServiceContextForDeveloperDir:FBXcodeConfiguration.developerDirectory error:&innerError];
+    NSAssert(serviceContext, @"Could not create a service context with error %@", innerError);
+    return [[FBSimulatorServiceContext_ContextBacked alloc] initWithProcessFetcher:processFetcher serviceContext:serviceContext];
+  }
+  return [[FBSimulatorServiceContext_Emulated alloc] initWithProcessFetcher:processFetcher];
 }
 
-- (instancetype)initWithServiceContext:(SimServiceContext *)serviceContext
+- (instancetype)initWithProcessFetcher:(FBSimulatorProcessFetcher *)processFetcher
 {
   self = [super init];
+  if (!self) {
+    return nil;
+  }
+
+  _processFetcher = processFetcher;
+
+  return self;
+}
+
+#pragma mark Public
+
+- (NSArray<NSString *> *)pathsOfAllDeviceSets
+{
+  return [[self.processFetcher launchdProcessesToContainingDeviceSet] allValues];
+}
+- (NSArray<SimRuntime *> *)supportedRuntimes
+{
+  NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
+  return nil;
+}
+
+- (NSArray<SimDeviceType *> *)supportedDeviceTypes
+{
+  NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
+  return nil;
+
+}
+
+- (SimDeviceSet *)createDeviceSetWithConfiguration:(FBSimulatorControlConfiguration *)configuration error:(NSError **)error
+{
+  NSError *innerError = nil;
+  NSString *deviceSetPath = configuration.deviceSetPath;
+  if (deviceSetPath != nil) {
+    if (![NSFileManager.defaultManager createDirectoryAtPath:deviceSetPath withIntermediateDirectories:YES attributes:nil error:&innerError]) {
+      return [[[FBSimulatorError
+        describeFormat:@"Failed to create custom SimDeviceSet directory at %@", deviceSetPath]
+        causedBy:innerError]
+        fail:error];
+    }
+  }
+
+  SimDeviceSet *deviceSet = [self createUnderlyingDeviceSet:deviceSetPath error:&innerError];
+  if (!deviceSet) {
+    return [[[FBSimulatorError
+      describeFormat:@"Could not create underlying device set for configuration %@", configuration]
+      causedBy:innerError]
+      fail:error];
+  }
+  return deviceSet;
+}
+
+#pragma mark Private
+
+- (SimDeviceSet *)createUnderlyingDeviceSet:(NSString *)deviceSetPath error:(NSError **)error
+{
+  NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
+  return nil;
+}
+
+- (BOOL)createDeviceSetDirectoryIfNeeded:(NSString *)deviceSetPath error:(NSError **)error
+{
+  NSError *innerError = nil;
+  if (deviceSetPath != nil) {
+    if (![NSFileManager.defaultManager createDirectoryAtPath:deviceSetPath withIntermediateDirectories:YES attributes:nil error:&innerError]) {
+      return [[[FBSimulatorError
+        describeFormat:@"Failed to create custom SimDeviceSet directory at %@", deviceSetPath]
+        causedBy:innerError]
+        failBool:error];
+    }
+  }
+  return YES;
+}
+
+@end
+
+@implementation FBSimulatorServiceContext_Emulated
+
+- (NSArray<SimRuntime *> *)supportedRuntimes
+{
+  return [objc_lookUpClass("SimRuntime") supportedRuntimes];
+}
+
+- (NSArray<SimDeviceType *> *)supportedDeviceTypes
+{
+  return [objc_lookUpClass("SimDeviceType") supportedDeviceTypes];
+}
+
+- (SimDeviceSet *)createUnderlyingDeviceSet:(NSString *)deviceSetPath error:(NSError **)error
+{
+  return deviceSetPath
+    ? [objc_lookUpClass("SimDeviceSet") setForSetPath:deviceSetPath]
+    : [objc_lookUpClass("SimDeviceSet") defaultSet];
+}
+
+@end
+
+@implementation FBSimulatorServiceContext_ContextBacked
+
+- (instancetype)initWithProcessFetcher:(FBSimulatorProcessFetcher *)processFetcher serviceContext:(SimServiceContext *)serviceContext
+{
+  self = [super initWithProcessFetcher:processFetcher];
   if (!self) {
     return nil;
   }
@@ -76,15 +189,13 @@
   return self;
 }
 
-#pragma mark Public
-
 - (NSArray<NSString *> *)pathsOfAllDeviceSets
 {
-  NSMutableArray<NSString *> *deviceSetPaths = [NSMutableArray array];
+  NSMutableSet<NSString *> *deviceSetPaths = [NSMutableSet setWithArray:[super pathsOfAllDeviceSets]];
   for (SimDeviceSet *deviceSet in self.serviceContext.allDeviceSets) {
     [deviceSetPaths addObject:deviceSet.setPath];
   }
-  return deviceSetPaths;
+  return [deviceSetPaths allObjects];
 }
 
 - (NSArray<SimRuntime *> *)supportedRuntimes
@@ -97,52 +208,11 @@
   return [self.serviceContext supportedDeviceTypes];
 }
 
-- (SimDeviceSet *)createDeviceSetWithConfiguration:(FBSimulatorControlConfiguration *)configuration error:(NSError **)error
+- (SimDeviceSet *)createUnderlyingDeviceSet:(NSString *)deviceSetPath error:(NSError **)error
 {
-  NSString *deviceSetPath = configuration.deviceSetPath;
-  if (!deviceSetPath) {
-    return [self.serviceContext defaultDeviceSetWithError:error];
-  }
-  deviceSetPath = [FBSimulatorServiceContext fullyQualifiedDeviceSetPath:configuration.deviceSetPath error:error];
-  if (!deviceSetPath) {
-    return nil;
-  }
-  NSError *innerError = nil;
-  SimDeviceSet *deviceSet = [self.serviceContext deviceSetWithPath:deviceSetPath error:&innerError];
-  if (!deviceSet) {
-    return [[[FBSimulatorError
-      describeFormat:@"Could not create underlying device set for configuration %@", configuration]
-      causedBy:innerError]
-      fail:error];
-  }
-  return deviceSet;
+  return deviceSetPath
+    ? [self.serviceContext deviceSetWithPath:deviceSetPath error:error]
+    : [self.serviceContext defaultDeviceSetWithError:error];
 }
-
-#pragma mark Private
-
-+ (NSString *)fullyQualifiedDeviceSetPath:(NSString *)deviceSetPath error:(NSError **)error
-{
-  NSParameterAssert(deviceSetPath);
-
-  NSError *innerError = nil;
-  if (![NSFileManager.defaultManager createDirectoryAtPath:deviceSetPath withIntermediateDirectories:YES attributes:nil error:&innerError]) {
-    return [[[FBSimulatorError
-      describeFormat:@"Failed to create custom SimDeviceSet directory at %@", deviceSetPath]
-      causedBy:innerError]
-      fail:error];
-  }
-
-  // -[NSString stringByResolvingSymlinksInPath] doesn't resolve /var to /private/var.
-  // This is important for -[SimServiceContext deviceSetWithPath:error], which internally caches based on a fully resolved path.
-  char pathBuffer[PATH_MAX + 1];
-  char *result = realpath(deviceSetPath.UTF8String, pathBuffer);
-  if (!result) {
-    return [[FBSimulatorError
-      describeFormat:@"Failed to get realpath for %@ '%s'", deviceSetPath, strerror(errno)]
-      fail:error];
-  }
-  return [[NSString alloc] initWithCString:pathBuffer encoding:NSASCIIStringEncoding];
-}
-
 
 @end

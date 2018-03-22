@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -15,8 +17,6 @@ NS_ASSUME_NONNULL_BEGIN
 @class FBApplicationLaunchConfiguration;
 @class FBInstalledApplication;
 @class FBProcessInfo;
-
-@protocol FBLaunchedProcess;
 
 /**
  Defines an interface for interacting with iOS Applications.
@@ -51,9 +51,9 @@ NS_ASSUME_NONNULL_BEGIN
  Launches an Application with the provided Application Launch Configuration.
 
  @param configuration the Application Launch Configuration to use.
- @return A future that resolves with the launched process.
+ @return A future that resolves when successful, with the process identifier of the launched process.
  */
-- (FBFuture<id<FBLaunchedProcess>> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration;
+- (FBFuture<NSNumber *> *)launchApplication:(FBApplicationLaunchConfiguration *)configuration;
 
 /**
  Kills application with the given bundle identifier.
@@ -65,7 +65,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  Fetches a list of the Installed Applications.
- The returned FBBundleDescriptor object is fully JSON Serializable.
+ The returned FBApplicationBundle object is fully JSON Serializable.
 
  @return A future wrapping a List of Installed Applications.
  */
@@ -80,19 +80,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (FBFuture<FBInstalledApplication *> *)installedApplicationWithBundleID:(NSString *)bundleID;
 
 /**
- Returns the Applications running on the target.
+ Returns the running Applications on the target.
+ The returned mapping is a mapping of Bundle ID to Process Info.
 
- @return A future wrapping a mapping of Bundle ID to Process ID.
+ @return A future wrapping a Mapping of Running Applications.
  */
-- (FBFuture<NSDictionary<NSString *, NSNumber *> *> *)runningApplications;
-
-/**
- Returns PID of application with given bundleID
-
- @param bundleID bundle ID of installed application.
- @return A future wrapping the process id.
- */
-- (FBFuture<NSNumber *> *)processIDWithBundleID:(NSString *)bundleID;
+- (FBFuture<NSDictionary<NSString *, FBProcessInfo *> *> *)runningApplications;
 
 @end
 

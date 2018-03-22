@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBAccessibilityFetch.h"
@@ -11,7 +13,7 @@
 #import "FBSimulatorConnection.h"
 #import "FBSimulatorLifecycleCommands.h"
 
-FBiOSTargetFutureType const FBiOSTargetFutureTypeAccessibilityFetch = @"accessibility_fetch";
+FBiOSTargetFutureType const FBiOSTargetFutureTypeAcessibilityFetch = @"accessibility_fetch";
 
 @implementation FBAccessibilityFetch
 
@@ -19,7 +21,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeAccessibilityFetch = @"accessib
 
 + (FBiOSTargetFutureType)futureType
 {
-  return FBiOSTargetFutureTypeAccessibilityFetch;
+  return FBiOSTargetFutureTypeAcessibilityFetch;
 }
 
 - (FBFuture<id<FBiOSTargetContinuation>> *)runWithTarget:(id<FBiOSTarget>)target consumer:(id<FBDataConsumer>)consumer reporter:(id<FBEventReporter>)reporter
@@ -66,7 +68,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeAccessibilityFetch = @"accessib
 
 - (NSString *)description
 {
-  return FBiOSTargetFutureTypeAccessibilityFetch;
+  return FBiOSTargetFutureTypeAcessibilityFetch;
 }
 
 - (BOOL)isEqual:(FBAccessibilityFetch *)object

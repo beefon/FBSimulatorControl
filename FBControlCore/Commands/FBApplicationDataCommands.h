@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -62,21 +64,21 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  Move data within the container to a different path
- @param originPaths relative paths to the container where data resides
+ @param originPath relative path to the container where data resides
  @param destinationPath relative path where the data will be moved to
  @param bundleID the Bundle Identifier of the Container.
  @return A future that resolves when successful.
  */
-- (FBFuture<NSNull *> *)movePaths:(NSArray<NSString *> *)originPaths toPath:(NSString *)destinationPath inContainerOfApplication:(NSString *)bundleID;
+- (FBFuture<NSNull *> *)movePath:(NSString *)originPath toPath:(NSString *)destinationPath inContainerOfApplication:(NSString *)bundleID;
 
 /**
  Remove path within the container
 
- @param paths relative paths to the container where data resides
+ @param path relative path to the container where data resides
  @param bundleID the Bundle Identifier of the Container.
  @return A future that resolves when successful.
  */
-- (FBFuture<NSNull *> *)removePaths:(NSArray<NSString *> *)paths inContainerOfApplication:(NSString *)bundleID;
+- (FBFuture<NSNull *> *)removePath:(NSString *)path inContainerOfApplication:(NSString *)bundleID;
 
 /**
  List directory within the container

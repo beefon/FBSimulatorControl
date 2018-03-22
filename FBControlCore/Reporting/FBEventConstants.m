@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBEventConstants.h"
@@ -13,11 +15,6 @@ FBJSONKey const FBJSONKeyLevel = @"level";
 FBJSONKey const FBJSONKeySubject = @"subject";
 FBJSONKey const FBJSONKeyTarget = @"target";
 FBJSONKey const FBJSONKeyTimestamp = @"timestamp";
-FBJSONKey const FBJSONKeyCallArguments = @"call_arguments";
-FBJSONKey const FBJSONKeyMessage = @"message";
-FBJSONKey const FBJSONKeyDuration = @"duration";
-FBJSONKey const FBJSONKeyArgument = @"argument";
-FBJSONKey const FBJSONKeyArguments = @"arguments";
 
 FBEventName const FBEventNameApprove = @"approve";
 FBEventName const FBEventNameClearKeychain = @"clear_keychain";
@@ -57,12 +54,7 @@ FBEventName const FBEventNameUninstall = @"uninstall";
 FBEventName const FBEventNameUpload = @"upload";
 FBEventName const FBEventNameWaitingForDebugger = @"waiting_for_debugger";
 FBEventName const FBEventNameWatchdogOverride = @"watchdog_override";
-FBEventName const FBEventNameLaunched = @"launched";
-FBEventName const FBEventNameTerminated = @"terminated";
-FBEventName const FBEventNameInvokeCall = @"call";
 
 FBEventType const FBEventTypeStarted = @"started";
 FBEventType const FBEventTypeEnded = @"ended";
 FBEventType const FBEventTypeDiscrete = @"discrete";
-FBEventType const FBEventTypeSuccess = @"success";
-FBEventType const FBEventTypeFailure = @"failure";

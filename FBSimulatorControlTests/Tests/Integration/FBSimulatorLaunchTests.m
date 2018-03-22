@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -35,7 +37,7 @@
     launchesThenRelaunchesApplication:appLaunch];
 }
 
-- (FBSimulator *)doTestApplication:(FBBundleDescriptor *)application launches:(FBApplicationLaunchConfiguration *)appLaunch
+- (FBSimulator *)doTestApplication:(FBApplicationBundle *)application launches:(FBApplicationLaunchConfiguration *)appLaunch
 {
   FBSimulator *simulator = [self assertObtainsBootedSimulatorWithConfiguration:self.simulatorConfiguration bootConfiguration:self.bootConfiguration];
   [self assertSimulator:simulator installs:application];
@@ -85,7 +87,7 @@
   XCTAssertNil(error);
   XCTAssertTrue(simulators);
 
-  XCTAssertEqual(self.control.set.allSimulators.count, 3u);
+  XCTAssertEqual(self.control.pool.allocatedSimulators.count, 3u);
   FBSimulator *simulator1 = simulators[0];
   FBSimulator *simulator2 = simulators[1];
   FBSimulator *simulator3 = simulators[2];
@@ -115,9 +117,9 @@
   XCTAssertTrue(success);
 
   FBFuture *freeFuture = [FBFuture futureWithFutures:@[
-    [simulator1 erase],
-    [simulator2 erase],
-    [simulator3 erase],
+    [simulator1.pool freeSimulator:simulator1],
+    [simulator2.pool freeSimulator:simulator2],
+    [simulator3.pool freeSimulator:simulator3],
   ]];
   success = [freeFuture await:&error] != nil;
   XCTAssertNil(error);
@@ -126,6 +128,7 @@
   for (FBSimulator *simulator in simulators) {
     [self assertSimulatorShutdown:simulator];
   }
+  XCTAssertEqual(self.control.pool.allocatedSimulators.count, 0u);
 }
 
 - (void)testLaunchesSafariApplication
@@ -145,7 +148,7 @@
 
 - (void)testCanUninstallApplication
 {
-  FBBundleDescriptor *application = self.tableSearchApplication;
+  FBApplicationBundle *application = self.tableSearchApplication;
   FBApplicationLaunchConfiguration *launch = self.tableSearchAppLaunch;
   FBSimulator *simulator = [self assertObtainsBootedSimulatorWithInstalledApplication:application];
 
@@ -156,7 +159,7 @@
 
   [self assertSimulator:simulator isRunningApplicationFromConfiguration:launch];
 
-  success = [[simulator uninstallApplicationWithBundleID:application.identifier] await:&error] != nil;
+  success = [[simulator uninstallApplicationWithBundleID:application.bundleID] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
 }

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBEventReporterSubject.h"
@@ -15,7 +17,7 @@
 
 @interface FBSimpleSubject : FBSingleItemSubject
 
-- (instancetype)initWithEventName:(FBEventName)eventName eventType:(FBEventType)eventType subject:(FBEventReporterSubject *)subject;
+- (instancetype)initWithName:(FBEventName)name type:(FBEventType)type subject:(FBEventReporterSubject *)subject;
 
 @end
 
@@ -61,25 +63,13 @@
 
 @end
 
-@interface FBCallSubject : FBEventReporterSubject
-
-@end
-
 @implementation FBEventReporterSubject
-
-@synthesize eventName = _eventName;
-@synthesize eventType = _eventType;
-@synthesize argument = _argument;
-@synthesize arguments = _arguments;
-@synthesize duration = _duration;
-@synthesize message = _message;
-@synthesize size = _size;
 
 #pragma mark Initializers
 
 + (instancetype)subjectWithName:(FBEventName)name type:(FBEventType)type subject:(id<FBEventReporterSubject>)subject
 {
-  return [[FBSimpleSubject alloc] initWithEventName:name eventType:type subject:subject];
+  return [[FBSimpleSubject alloc] initWithName:name type:type subject:subject];
 }
 
 + (instancetype)subjectWithName:(FBEventName)name type:(FBEventType)type value:(id<FBJSONSerializable>)value
@@ -134,69 +124,6 @@
   return [[FBCompositeSubject alloc] initWithArray:subjects];
 }
 
-+ (instancetype)subjectForEvent:(FBEventName)eventName
-{
-  return [[FBCallSubject alloc] initWithEventName:eventName eventType:FBEventTypeDiscrete argument:nil arguments:nil duration:nil size:nil message:nil];
-}
-
-+ (instancetype)subjectForStartedCall:(NSString *)call argument:(NSDictionary<NSString *, NSString *> *)argument
-{
-  return [[FBCallSubject alloc] initWithEventName:call eventType:FBEventTypeStarted argument:argument arguments:nil duration:nil size:nil message:nil];
-}
-
-+ (instancetype)subjectForStartedCall:(NSString *)call arguments:(NSArray<NSString *> *)arguments
-{
-  return [[FBCallSubject alloc] initWithEventName:call eventType:FBEventTypeStarted argument:nil arguments:arguments duration:nil size:nil message:nil];
-}
-
-+ (instancetype)subjectForSuccessfulCall:(NSString *)call duration:(NSTimeInterval)duration argument:(NSDictionary<NSString *, NSString *> *)argument
-{
-  return [[FBCallSubject alloc] initWithEventName:call eventType:FBEventTypeSuccess argument:argument arguments:nil duration:[self durationMilliseconds:duration] size:nil message:nil];
-}
-
-+ (instancetype)subjectForSuccessfulCall:(NSString *)call duration:(NSTimeInterval)duration size:(NSNumber *)size arguments:(NSArray<NSString *> *)arguments
-{
-  return [[FBCallSubject alloc] initWithEventName:call eventType:FBEventTypeSuccess argument:nil arguments:arguments duration:[self durationMilliseconds:duration] size:size message:nil];
-}
-
-+ (instancetype)subjectForFailingCall:(NSString *)call duration:(NSTimeInterval)duration message:(NSString *)message argument:(NSDictionary<NSString *, NSString *> *)argument
-{
-  return [[FBCallSubject alloc] initWithEventName:call eventType:FBEventTypeFailure argument:argument arguments:nil duration:[self durationMilliseconds:duration] size:nil message:message];
-}
-
-+ (instancetype)subjectForFailingCall:(NSString *)call duration:(NSTimeInterval)duration message:(NSString *)message size:(NSNumber *)size arguments:(NSArray<NSString *> *)arguments
-{
-  return [[FBCallSubject alloc] initWithEventName:call eventType:FBEventTypeFailure argument:nil arguments:arguments duration:[self durationMilliseconds:duration] size:size message:message];
-}
-
-- (instancetype)init
-{
-  return [self initWithEventName:nil eventType:nil];
-}
-
-- (instancetype)initWithEventName:(FBEventName)eventName eventType:(FBEventType)eventType
-{
-  return [self initWithEventName:eventName eventType:eventType argument:nil arguments:nil duration:nil size:nil message:nil];
-}
-
-- (instancetype)initWithEventName:(FBEventName)eventName eventType:(FBEventType)eventType argument:(NSDictionary<NSString *, NSString *> *)argument arguments:(NSArray<NSString *> *)arguments duration:(NSNumber *)duration size:(NSNumber *)size message:(NSString *)message
-{
-  self = [super init];
-  if (!self) {
-    return nil;
-  }
-
-  _eventName = eventName;
-  _eventType = eventType;
-  _argument = argument;
-  _arguments = arguments;
-  _duration = duration;
-  _size = size;
-  _message = message;
-
-  return self;
-}
-
 #pragma mark FBEventReporterSubject Protocol Implementation
 
 - (id)jsonSerializableRepresentation
@@ -225,14 +152,6 @@
   return  @[self];
 }
 
-#pragma mark Private
-
-+ (NSNumber *)durationMilliseconds:(NSTimeInterval)timeInterval
-{
-  NSUInteger milliseconds = (NSUInteger) (timeInterval * 1000);
-  return @(milliseconds);
-}
-
 @end
 
 @implementation FBSingleItemSubject
@@ -246,6 +165,8 @@
 
 @interface FBSimpleSubject ()
 
+@property (nonatomic, copy, readonly) FBEventName eventName;
+@property (nonatomic, copy, readonly) FBEventType eventType;
 @property (nonatomic, retain, readonly) FBEventReporterSubject *subject;
 
 @end
@@ -253,13 +174,17 @@
 
 @implementation FBSimpleSubject
 
-- (instancetype)initWithEventName:(FBEventName)eventName eventType:(FBEventType)eventType subject:(FBEventReporterSubject *)subject
+- (instancetype)initWithName:(FBEventName)name
+                        type:(FBEventType)type
+                     subject:(FBEventReporterSubject *)subject
 {
-  self = [super initWithEventName:eventName eventType:eventType];
+  self = [super init];
   if (!self) {
     return nil;
   }
 
+  _eventName = name;
+  _eventType = type;
   _subject = subject;
 
   return self;
@@ -362,6 +287,8 @@
 @interface FBiOSTargetWithSubject ()
 
 @property (nonatomic, copy, readonly) FBiOSTargetSubject *targetSubject;
+@property (nonatomic, copy, readonly) FBEventName eventName;
+@property (nonatomic, copy, readonly) FBEventType eventType;
 @property (nonatomic, retain, readonly) FBEventReporterSubject *subject;
 @property (nonatomic, retain, readonly) NSDate *timestamp;
 
@@ -369,14 +296,19 @@
 
 @implementation FBiOSTargetWithSubject
 
-- (instancetype)initWithTargetSubject:(FBiOSTargetSubject *)targetSubject eventName:(FBEventName)eventName eventType:(FBEventType)eventType subject:(FBEventReporterSubject *)subject
+- (instancetype)initWithTargetSubject:(FBiOSTargetSubject *)targetSubject
+                            eventName:(FBEventName)eventName
+                            eventType:(FBEventType)eventType
+                              subject:(FBEventReporterSubject *)subject
 {
-  self = [super initWithEventName:eventName eventType:eventType];
+  self = [super init];
   if (!self) {
     return nil;
   }
 
   _targetSubject = targetSubject;
+  _eventName = eventName;
+  _eventType = eventType;
   _subject = subject;
   _timestamp = [NSDate date];
 
@@ -562,24 +494,6 @@
 - (NSString *)description
 {
   return [FBCollectionInformation oneLineDescriptionFromArray:self.strings];
-}
-
-@end
-
-@implementation FBCallSubject
-
-#pragma mark FBEventReporterSubject
-
-- (id)jsonSerializableRepresentation
-{
-  return @{
-    FBJSONKeyEventName: self.eventName,
-    FBJSONKeyEventType: self.eventType,
-    FBJSONKeyDuration: self.duration ?: NSNull.null,
-    FBJSONKeyMessage: self.message ?: NSNull.null,
-    FBJSONKeyArgument: self.argument ?: NSNull.null,
-    FBJSONKeyArguments: self.arguments ?: NSNull.null,
-  };
 }
 
 @end

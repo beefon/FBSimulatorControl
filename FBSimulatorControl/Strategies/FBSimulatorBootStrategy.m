@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorBootStrategy.h"
@@ -19,7 +21,7 @@
 
 #import <FBControlCore/FBControlCore.h>
 
-#import "FBBundleDescriptor+Simulator.h"
+#import "FBApplicationBundle+Simulator.h"
 #import "FBFramebuffer.h"
 #import "FBFramebufferConfiguration.h"
 #import "FBFramebufferConnectStrategy.h"
@@ -159,10 +161,34 @@
 
 @end
 
+@interface FBCoreSimulatorBootOptions_Xcode7 : NSObject <FBCoreSimulatorBootOptions>
+@end
+
 @interface FBCoreSimulatorBootOptions_Xcode8 : NSObject <FBCoreSimulatorBootOptions>
 @end
 
 @interface FBCoreSimulatorBootOptions_Xcode9_10 : NSObject <FBCoreSimulatorBootOptions>
+@end
+
+@implementation FBCoreSimulatorBootOptions_Xcode7
+
+- (BOOL)shouldCreateFramebuffer:(FBSimulatorBootConfiguration *)configuration
+{
+  // A Framebuffer is required in Xcode 7 currently, otherwise any interface that uses the Mach Interface for 'Host Support' will fail/hang.
+  return YES;
+}
+
+- (NSDictionary<NSString *, id> *)bootOptions:(FBSimulatorBootConfiguration *)configuration
+{
+  // The 'register-head-services' option will attach the existing 'frameBufferService' when the Simulator is booted.
+  // Simulator.app behaves similarly, except we can't peek at the Framebuffer as it is in a protected process since Xcode 7.
+  // Prior to Xcode 6 it was possible to shim into the Simulator process but codesigning now prevents this https://gist.github.com/lawrencelomax/27bdc4e8a433a601008f
+
+  return @{
+    @"register-head-services" : @YES,
+  };
+}
+
 @end
 
 @implementation FBCoreSimulatorBootOptions_Xcode8
@@ -233,7 +259,7 @@
   }
 
   // Create the Framebuffer (if required to do so).
-  FBFuture *framebufferFuture = FBFuture.empty;
+  FBFuture *framebufferFuture = [FBFuture futureWithResult:NSNull.null];
   if ([self.options shouldCreateFramebuffer:self.configuration]) {
     // If we require a Framebuffer, but don't have one provided, we should use the default one.
     FBFramebufferConfiguration *configuration = self.configuration.framebuffer;
@@ -304,7 +330,7 @@
 - (FBFuture<NSNull *> *)launchSimulatorProcessWithArguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment;
 {
   return [[[[[[FBTaskBuilder
-    withLaunchPath:FBBundleDescriptor.xcodeSimulator.binary.path]
+    withLaunchPath:FBApplicationBundle.xcodeSimulator.binary.path]
     withArguments:arguments]
     withEnvironmentAdditions:environment]
     start]
@@ -320,7 +346,7 @@
 {
   // The NSWorkspace API allows for arguments & environment to be provided to the launched application
   // Additionally, multiple Apps of the same application can be launched with the NSWorkspaceLaunchNewInstance option.
-  NSURL *applicationURL = [NSURL fileURLWithPath:FBBundleDescriptor.xcodeSimulator.path];
+  NSURL *applicationURL = [NSURL fileURLWithPath:FBApplicationBundle.xcodeSimulator.path];
   NSDictionary *appLaunchConfiguration = @{
     NSWorkspaceLaunchConfigurationArguments : arguments,
     NSWorkspaceLaunchConfigurationEnvironment : environment,
@@ -339,7 +365,7 @@
       causedBy:error]
       failFuture];
   }
-  return FBFuture.empty;
+  return [FBFuture futureWithResult:NSNull.null];
 }
 
 @end
@@ -369,6 +395,9 @@
 
   NSString *setPath = simulator.set.deviceSet.setPath;
   if (setPath) {
+    if (!FBXcodeConfiguration.supportsCustomDeviceSets) {
+      return [[[FBSimulatorError describe:@"Cannot use custom Device Set on current platform"] inSimulator:simulator] fail:error];
+    }
     [arguments addObjectsFromArray:@[@"-DeviceSetPath", setPath]];
   }
   return [arguments copy];
@@ -448,7 +477,7 @@
 {
   // Return early if we shouldn't launch the Application
   if (![self.options shouldLaunchSimulatorApplication:self.configuration simulator:self.simulator]) {
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
   // Fetch the Boot Arguments & Environment
@@ -472,7 +501,7 @@
     onQueue:self.simulator.workQueue fmap:^(NSNull *_) {
       return [self.simulator resolveState:FBiOSTargetStateBooted];
     }]
-    onQueue:self.simulator.workQueue fmap:^ FBFuture<NSNull *> * (NSNull *_) {
+    onQueue:self.simulator.workQueue fmap:^(NSNull *_) {
       FBProcessInfo *containerApplication = [self.simulator.processFetcher simulatorApplicationProcessForSimDevice:self.simulator.device];
       if (!containerApplication) {
         return [[FBSimulatorError
@@ -480,7 +509,7 @@
           failFuture];
       }
       [self.simulator.eventSink containerApplicationDidLaunch:containerApplication];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 }
 
@@ -502,8 +531,10 @@
 {
   if (FBXcodeConfiguration.isXcode9OrGreater) {
     return [FBCoreSimulatorBootOptions_Xcode9_10 new];
-  } else {
+  } else if (FBXcodeConfiguration.isXcode8OrGreater) {
     return [FBCoreSimulatorBootOptions_Xcode8 new];
+  } else {
+    return [FBCoreSimulatorBootOptions_Xcode7 new];
   }
 }
 
@@ -540,7 +571,7 @@
 {
   // Return early depending on Simulator state.
   if (self.simulator.state == FBiOSTargetStateBooted) {
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
   if (self.simulator.state != FBiOSTargetStateShutdown) {
     return [[[FBSimulatorError

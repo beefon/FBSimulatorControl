@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulator.h"
@@ -27,8 +29,8 @@
 #import "FBSimulatorConfiguration+CoreSimulator.h"
 #import "FBSimulatorConfiguration.h"
 #import "FBSimulatorControlConfiguration.h"
+#import "FBSimulatorControlOperator.h"
 #import "FBSimulatorCrashLogCommands.h"
-#import "FBSimulatorDebuggerCommands.h"
 #import "FBSimulatorDiagnostics.h"
 #import "FBSimulatorError.h"
 #import "FBSimulatorEventSink.h"
@@ -39,6 +41,7 @@
 #import "FBSimulatorMediaCommands.h"
 #import "FBSimulatorMutableState.h"
 #import "FBSimulatorNotificationEventSink.h"
+#import "FBSimulatorPool.h"
 #import "FBSimulatorScreenshotCommands.h"
 #import "FBSimulatorSet.h"
 #import "FBSimulatorSettingsCommands.h"
@@ -51,6 +54,7 @@
 
 @implementation FBSimulator
 
+@synthesize deviceOperator = _deviceOperator;
 @synthesize auxillaryDirectory = _auxillaryDirectory;
 @synthesize logger = _logger;
 
@@ -64,12 +68,11 @@
     set:set
     processFetcher:set.processFetcher
     auxillaryDirectory:[FBSimulator auxillaryDirectoryFromSimDevice:device configuration:configuration]
-    logger:set.logger
-    reporter:set.reporter]
+    logger:set.logger]
     attachEventSinkCompositionWithLaunchdSimProcess:launchdSimProcess containerApplicationProcess:containerApplicationProcess];
 }
 
-- (instancetype)initWithDevice:(SimDevice *)device configuration:(FBSimulatorConfiguration *)configuration set:(FBSimulatorSet *)set processFetcher:(FBSimulatorProcessFetcher *)processFetcher auxillaryDirectory:(NSString *)auxillaryDirectory logger:(id<FBControlCoreLogger>)logger reporter:(id<FBEventReporter>)reporter
+- (instancetype)initWithDevice:(SimDevice *)device configuration:(FBSimulatorConfiguration *)configuration set:(FBSimulatorSet *)set processFetcher:(FBSimulatorProcessFetcher *)processFetcher auxillaryDirectory:(NSString *)auxillaryDirectory logger:(nullable id<FBControlCoreLogger>)logger
 {
   self = [super init];
   if (!self) {
@@ -82,10 +85,7 @@
   _processFetcher = processFetcher;
   _auxillaryDirectory = auxillaryDirectory;
   _logger = [logger withName:device.UDID.UUIDString];
-  _forwarder = [FBLoggingWrapper
-    wrap:[FBiOSTargetCommandForwarder forwarderWithTarget:self commandClasses:FBSimulator.commandResponders statefulCommands:FBSimulator.statefulCommands]
-    eventReporter:reporter
-    logger:nil];
+  _forwarder = [FBiOSTargetCommandForwarder forwarderWithTarget:self commandClasses:FBSimulator.commandResponders statefulCommands:FBSimulator.statefulCommands];
 
   return self;
 }
@@ -118,6 +118,14 @@
     FBSimulatorHIDEvent.class,
     FBTestLaunchConfiguration.class,
   ];
+}
+
+- (id<FBDeviceOperator>)deviceOperator
+{
+  if (_deviceOperator == nil) {
+    _deviceOperator = [FBSimulatorControlOperator operatorWithSimulator:self];
+  }
+  return _deviceOperator;
 }
 
 - (NSString *)udid
@@ -210,6 +218,14 @@
   return self.device.dataPath;
 }
 
+- (BOOL)isAllocated
+{
+  if (!self.pool) {
+    return NO;
+  }
+  return [self.pool.allocatedSimulators containsObject:self];
+}
+
 - (FBProcessInfo *)launchdProcess
 {
   return self.mutableState.launchdProcess;
@@ -286,24 +302,17 @@
   return [self.forwarder forwardingTargetForSelector:selector];
 }
 
-- (void)forwardInvocation:(NSInvocation *)invocation
-{
-  [self.forwarder forwardInvocation:invocation];
-}
-
 + (NSArray<Class> *)commandResponders
 {
   static dispatch_once_t onceToken;
   static NSArray<Class> *commandClasses;
   dispatch_once(&onceToken, ^{
     commandClasses = @[
-      FBInstrumentsCommands.class,
       FBSimulatorAgentCommands.class,
       FBSimulatorApplicationCommands.class,
       FBSimulatorApplicationDataCommands.class,
       FBSimulatorBridgeCommands.class,
       FBSimulatorCrashLogCommands.class,
-      FBSimulatorDebuggerCommands.class,
       FBSimulatorKeychainCommands.class,
       FBSimulatorLaunchCtlCommands.class,
       FBSimulatorLifecycleCommands.class,

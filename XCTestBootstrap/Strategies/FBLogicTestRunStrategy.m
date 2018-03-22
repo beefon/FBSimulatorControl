@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBLogicTestRunStrategy.h"
@@ -89,7 +91,6 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
 
 - (FBFuture<NSNull *> *)testFutureWithShimOutput:(id<FBProcessFileOutput>)shimOutput stdOutConsumer:(id<FBDataConsumer>)stdOutConsumer stdErrConsumer:(id<FBDataConsumer>)stdErrConsumer shimConsumer:(id<FBDataConsumerLifecycle>)shimConsumer uuid:(NSUUID *)uuid
 {
-  [self.logger logFormat:@"Starting Logic Test execution of %@", [FBCollectionInformation oneLineJSONDescription:self.configuration]];
   id<FBLogicXCTestReporter> reporter = self.reporter;
   [reporter didBeginExecutingTestPlan];
 
@@ -106,7 +107,7 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
   [environment addEntriesFromDictionary:self.configuration.processUnderTestEnvironment];
 
   // Get the Launch Path and Arguments for the xctest process.
-  NSString *testSpecifier = self.configuration.testFilter ?: @"All";
+  NSString *testSpecifier = self.configuration.testFilters.firstObject ?: @"All";
   NSString *launchPath = xctestPath;
   NSArray<NSString *> *arguments = @[@"-XCTest", testSpecifier, self.configuration.testBundlePath];
 
@@ -123,27 +124,23 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
 
 - (FBFuture<NSNull *> *)completeLaunchedProcess:(id<FBLaunchedProcess>)process shimOutput:(id<FBProcessFileOutput>)shimOutput shimConsumer:(id<FBDataConsumerLifecycle>)shimConsumer
 {
-  id<FBControlCoreLogger> logger = self.logger;
   id<FBLogicXCTestReporter> reporter = self.reporter;
   dispatch_queue_t queue = self.executor.workQueue;
 
   return [[[[[FBLogicTestRunStrategy
     fromQueue:queue waitForDebuggerToBeAttached:self.configuration.waitForDebugger forProcessIdentifier:process.processIdentifier reporter:reporter]
     onQueue:queue fmap:^(id _) {
-      [logger logFormat:@"Starting to read shim output from location %@", shimOutput.filePath];
       return [shimOutput startReading];
     }]
     onQueue:queue fmap:^(FBFileReader *reader) {
-      [logger logFormat:@"Shim output at %@ has been opened for reading, waiting for xctest process to exit", shimOutput.filePath];
       return [FBLogicTestRunStrategy onQueue:queue waitForExit:process closingOutput:shimOutput consumer:shimConsumer];
     }]
     onQueue:queue handleError:^(NSError *error) {
-      [logger logFormat:@"Abnormal exit of xctest process %@", error];
-      [reporter didCrashDuringTest:error];
+      // Abnormal exit
+      [self.reporter didCrashDuringTest:error];
       return [FBFuture futureWithError:error];
     }]
     onQueue:queue map:^(id _) {
-      [logger log:@"Normal exit of xctest process"];
       [reporter didFinishExecutingTestPlan];
       return NSNull.null;
     }];
@@ -161,7 +158,7 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
       return [[FBFuture
         futureWithFutures:@[
           [output stopReading],
-          [consumer finishedConsuming],
+          [consumer eofHasBeenReceived],
         ]]
         timeout:EndOfFileFromStopReadingTimeout waitingFor:@"recieve and end-of-file after fifo has been stopped, as the process has already exited with code %@", exitCode];
     }];
@@ -170,7 +167,7 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
 + (FBFuture<NSNull *> *)fromQueue:(dispatch_queue_t)queue waitForDebuggerToBeAttached:(BOOL)waitFor forProcessIdentifier:(pid_t)processIdentifier reporter:(id<FBLogicXCTestReporter>)reporter
 {
   if (!waitFor) {
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
   // Report from the current queue, but wait in a special queue.
@@ -183,7 +180,7 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
       waitid(P_PID, (id_t)processIdentifier, NULL, WCONTINUED);
       [reporter debuggerAttached];
 
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }]
     onQueue:queue map:^(id _) {
       [reporter debuggerAttached];
@@ -204,17 +201,17 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
   NSMutableArray<id<FBDataConsumer>> *stdOutConsumers = [NSMutableArray array];
   NSMutableArray<id<FBDataConsumer>> *stdErrConsumers = [NSMutableArray array];
 
-  id<FBDataConsumer> shimReportingConsumer = [FBBlockDataConsumer asynchronousLineConsumerWithQueue:queue dataConsumer:^(NSData *line) {
+  id<FBDataConsumer> shimReportingConsumer = [FBLineDataConsumer asynchronousReaderWithQueue:queue dataConsumer:^(NSData *line) {
     [reporter handleEventJSONData:line];
   }];
   [shimConsumers addObject:shimReportingConsumer];
 
-  id<FBDataConsumer> stdOutReportingConsumer = [FBBlockDataConsumer asynchronousLineConsumerWithQueue:queue consumer:^(NSString *line){
+  id<FBDataConsumer> stdOutReportingConsumer = [FBLineDataConsumer asynchronousReaderWithQueue:queue consumer:^(NSString *line){
     [reporter testHadOutput:[line stringByAppendingString:@"\n"]];
   }];
   [stdOutConsumers addObject:stdOutReportingConsumer];
 
-  id<FBDataConsumer> stdErrReportingConsumer = [FBBlockDataConsumer asynchronousLineConsumerWithQueue:queue consumer:^(NSString *line){
+  id<FBDataConsumer> stdErrReportingConsumer = [FBLineDataConsumer asynchronousReaderWithQueue:queue consumer:^(NSString *line){
     [reporter testHadOutput:[line stringByAppendingString:@"\n"]];
   }];
   [stdErrConsumers addObject:stdErrReportingConsumer];
@@ -243,11 +240,6 @@ static NSTimeInterval EndOfFileFromStopReadingTimeout = 5;
 
 - (FBFuture<id<FBLaunchedProcess>> *)startTestProcessWithLaunchPath:(NSString *)launchPath arguments:(NSArray<NSString *> *)arguments environment:(NSDictionary<NSString *, NSString *> *)environment stdOutConsumer:(id<FBDataConsumer>)stdOutConsumer stdErrConsumer:(id<FBDataConsumer>)stdErrConsumer
 {
-  [self.logger logFormat:
-    @"Launching xctest process with arguments %@, environment %@",
-    [FBCollectionInformation oneLineDescriptionFromArray:[@[launchPath] arrayByAddingObjectsFromArray:arguments]],
-    [FBCollectionInformation oneLineDescriptionFromDictionary:environment]
-  ];
   return [FBXCTestProcess
     startWithLaunchPath:launchPath
     arguments:arguments

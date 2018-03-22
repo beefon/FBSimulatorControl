@@ -16,19 +16,20 @@
 
 #pragma mark Protocol Adaptor
 
-@interface FBDeviceLogOperation : NSObject <FBLogOperation>
+@interface FBDeviceLogTerminationContinuation : NSObject <FBiOSTargetContinuation>
+
+- (instancetype)initWithReader:(FBFileReader *)reader completed:(FBMutableFuture<NSNull *> *)completed;
 
 @property (nonatomic, strong, readonly) FBFileReader *reader;
 @property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *completed;
 
 @end
 
-@implementation FBDeviceLogOperation
+@implementation FBDeviceLogTerminationContinuation
 
 @synthesize completed = _completed;
-@synthesize consumer = _consumer;
 
-- (instancetype)initWithReader:(FBFileReader *)reader consumer:(id<FBDataConsumer>)consumer completed:(FBMutableFuture<NSNull *> *)completed
+- (instancetype)initWithReader:(FBFileReader *)reader completed:(FBMutableFuture<NSNull *> *)completed
 {
   self = [self init];
   if (!self) {
@@ -36,7 +37,6 @@
   }
 
   _reader = reader;
-  _consumer = consumer;
   _completed = completed;
 
   return self;
@@ -85,25 +85,24 @@
   return [[FBDeviceControlError describeFormat:@"%@ is unimplemented", NSStringFromSelector(_cmd)] failFuture];
 }
 
-- (FBFuture<id<FBLogOperation>> *)tailLog:(NSArray<NSString *> *)arguments consumer:(id<FBDataConsumer>)consumer
+- (FBFuture<id<FBiOSTargetContinuation>> *)tailLog:(NSArray<NSString *> *)arguments consumer:(id<FBDataConsumer>)consumer
 {
   if (arguments.count == 0) {
     NSString *unsupportedArgumentsMessage = [NSString stringWithFormat:@"[FBDeviceLogCommands][rdar://38452839] Unsupported arguments: %@", arguments];
     [consumer consumeData:[unsupportedArgumentsMessage dataUsingEncoding:NSUTF8StringEncoding]];
     [self.device.logger log:unsupportedArgumentsMessage];
   }
-  id<FBControlCoreLogger> logger = self.device.logger;
 
   dispatch_queue_t queue = self.device.asyncQueue;
   return [[[self.device.amDevice
     startService:@"com.apple.syslog_relay"]
     onQueue:queue pend:^(FBAMDServiceConnection *connection) {
-      [logger logFormat:@"Reading log data from %@", connection];
-      FBFileReader *reader = [FBFileReader readerWithFileDescriptor:connection.socket closeOnEndOfFile:NO consumer:consumer logger:nil];
+      NSFileHandle *handle = [[NSFileHandle alloc] initWithFileDescriptor:connection.socket closeOnDealloc:YES];
+      FBFileReader *reader = [FBFileReader readerWithFileHandle:handle consumer:consumer logger:nil];
       return [[reader startReading] mapReplace:reader];
     }]
     onQueue:queue enter:^(FBFileReader *reader, FBMutableFuture<NSNull *> *teardown) {
-      return [[FBDeviceLogOperation alloc] initWithReader:reader consumer:consumer completed:teardown];
+      return [[FBDeviceLogTerminationContinuation alloc] initWithReader:reader completed:teardown];
     }];
 }
 

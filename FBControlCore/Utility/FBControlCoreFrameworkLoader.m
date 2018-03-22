@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBControlCoreFrameworkLoader.h"
@@ -16,14 +18,9 @@
 
 void *FBGetSymbolFromHandle(void *handle, const char *name)
 {
-  void *function = FBGetSymbolFromHandleOptional(handle, name);
+  void *function = dlsym(handle, name);
   NSCAssert(function, @"%s could not be located", name);
   return function;
-}
-
-void *FBGetSymbolFromHandleOptional(void *handle, const char *name)
-{
-  return dlsym(handle, name);
 }
 
 @implementation FBControlCoreFrameworkLoader

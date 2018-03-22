@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBDeviceDebuggerCommands.h"
@@ -57,10 +59,10 @@ static void MountCallback(NSDictionary<NSString *, id> *callbackDictionary, FBAM
 
 #pragma mark FBDebuggerCommands Implementation
 
-- (FBFuture<id<FBDebugServer>> *)launchDebugServerForHostApplication:(FBBundleDescriptor *)application port:(in_port_t)port
+- (FBFuture<id<FBDebugServer>> *)launchDebugServerForApplicationWithPath:(NSString *)path port:(in_port_t)port
 {
   return [[self
-    lldbBootstrapCommandsForApplicationAtPath:application.path port:port]
+    lldbBootstrapCommandsForApplicationAtPath:path port:port]
     onQueue:self.device.workQueue fmap:^(NSArray<NSString *> *commands) {
       return [FBDeviceDebugServer debugServerForServiceConnection:[self connectToDebugServer] port:port lldbBootstrapCommands:commands queue:self.device.workQueue logger:self.device.logger];
     }];
@@ -110,10 +112,10 @@ static void MountCallback(NSDictionary<NSString *, id> *callbackDictionary, FBAM
     }];
 }
 
-- (FBFuture<FBBundleDescriptor *> *)applicationBundleForPath:(NSString *)path
+- (FBFuture<FBApplicationBundle *> *)applicationBundleForPath:(NSString *)path
 {
   return [FBFuture resolveValue:^(NSError **error) {
-    return [FBBundleDescriptor bundleFromPath:path error:error];
+    return [FBApplicationBundle applicationWithPath:path error:error];
   }];
 }
 
@@ -121,11 +123,11 @@ static void MountCallback(NSDictionary<NSString *, id> *callbackDictionary, FBAM
 {
   return [[self
     applicationBundleForPath:path]
-    onQueue:self.device.workQueue fmap:^(FBBundleDescriptor *bundle) {
+    onQueue:self.device.workQueue fmap:^(FBApplicationBundle *bundle) {
       return [FBFuture futureWithFutures:@[
         [self platformSelectCommand],
         [FBDeviceDebuggerCommands localTargetForApplicationAtPath:path],
-        [self remoteTargetForBundleID:bundle.identifier],
+        [self remoteTargetForBundleID:bundle.bundleID],
         [FBDeviceDebuggerCommands processConnectForPort:port],
       ]];
     }];

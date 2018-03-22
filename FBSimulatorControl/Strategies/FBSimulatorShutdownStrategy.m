@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorShutdownStrategy.h"
@@ -62,7 +64,7 @@
   // Calling shutdown when already shutdown should be avoided (if detected).
   if (simulator.state == FBiOSTargetStateShutdown) {
     [logger.debug logFormat:@"Shutdown of %@ succeeded as it is already shutdown", simulator.udid];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }
 
   // Xcode 7 has a 'Creating' step that we should wait on before confirming the simulator is ready.
@@ -81,7 +83,13 @@
   if (FBXcodeConfiguration.isXcode9OrGreater) {
     return 164;
   }
-  return 163;
+  if (FBXcodeConfiguration.isXcode8OrGreater) {
+    return 163;
+  }
+  if (FBXcodeConfiguration.isXcode7OrGreater) {
+    return 159;
+  }
+  return 146;
 }
 
 + (FBFuture<NSNull *> *)shutdownSimulator:(FBSimulator *)simulator
@@ -115,7 +123,7 @@
     timeout:FBControlCoreGlobalConfiguration.regularTimeout waitingFor:@"Simulator to resolve state %@", FBiOSTargetStateStringShutdown]
     onQueue:simulator.workQueue chain:^FBFuture<NSNull *> *(FBFuture *future) {
       if (future.result) {
-        return FBFuture.empty;
+        return [FBFuture futureWithResult:NSNull.null];
       }
       return [FBSimulatorShutdownStrategy eraseSimulator:simulator];
     }];

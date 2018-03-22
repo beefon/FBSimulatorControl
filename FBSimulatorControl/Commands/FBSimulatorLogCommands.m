@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorLogCommands.h"
@@ -14,41 +16,6 @@
 #import "FBSimulator+Private.h"
 #import "FBSimulatorAgentOperation.h"
 #import "FBSimulatorError.h"
-
-@interface FBSimulatorLogOperation : NSObject <FBLogOperation>
-
-@property (nonatomic, strong, readonly) FBSimulatorAgentOperation *operation;
-
-@end
-
-@implementation FBSimulatorLogOperation
-
-@synthesize consumer = _consumer;
-
-- (instancetype)initWithOperation:(FBSimulatorAgentOperation *)operation consumer:(id<FBDataConsumer>)consumer
-{
-  self = [self init];
-  if (!self) {
-    return nil;
-  }
-
-  _operation = operation;
-  _consumer = consumer;
-
-  return self;
-}
-
-- (FBiOSTargetFutureType)futureType
-{
-  return FBiOSTargetFutureTypeLogTail;
-}
-
-- (FBFuture<NSNull *> *)completed
-{
-  return self.operation.completed;
-}
-
-@end
 
 @interface FBSimulatorLogCommands ()
 
@@ -79,18 +46,14 @@
 
 #pragma mark Public
 
-- (FBFuture<id<FBLogOperation>> *)tailLog:(NSArray<NSString *> *)arguments consumer:(id<FBDataConsumer>)consumer
+- (FBFuture<id<FBiOSTargetContinuation>> *)tailLog:(NSArray<NSString *> *)arguments consumer:(id<FBDataConsumer>)consumer
 {
-  return (FBFuture<id<FBLogOperation>> *) [[self
-    startLogCommand:[@[@"stream"] arrayByAddingObjectsFromArray:arguments] consumer:consumer]
-    onQueue:self.simulator.workQueue map:^(FBSimulatorAgentOperation *operation) {
-      return [[FBSimulatorLogOperation alloc] initWithOperation:operation consumer:consumer];
-    }];
+  return (FBFuture<id<FBiOSTargetContinuation>> *) [self startLogCommand:[@[@"stream"] arrayByAddingObjectsFromArray:arguments] consumer:consumer];
 }
 
 - (FBFuture<NSArray<NSString *> *> *)logLinesWithArguments:(NSArray<NSString *> *)arguments
 {
-  id<FBAccumulatingBuffer> consumer = FBDataBuffer.accumulatingBuffer;
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
   return [[self
     runLogCommandAndWait:arguments consumer:consumer]
     onQueue:self.simulator.asyncQueue fmap:^(id _){
@@ -112,14 +75,14 @@
       // Re-Map from Launch to Exit
       return [operation processStatus];
     }]
-    onQueue:self.simulator.asyncQueue fmap:^ FBFuture<NSNull *> * (NSNumber *statLoc){
+    onQueue:self.simulator.asyncQueue fmap:^(NSNumber *statLoc){
       // Check the exit code.
       int value = statLoc.intValue;
       int exitCode = WEXITSTATUS(value);
       if (exitCode != 0) {
         return [FBFuture futureWithError:[FBSimulatorError errorForFormat:@"log exited with code %d, arguments %@", exitCode, arguments]];
       }
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
   }];
 }
 

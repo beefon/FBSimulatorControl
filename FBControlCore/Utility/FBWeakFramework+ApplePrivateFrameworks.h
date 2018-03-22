@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <FBControlCore/FBWeakFramework.h>
@@ -20,6 +22,14 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)CoreSimulator;
 + (instancetype)SimulatorKit;
 + (instancetype)DTXConnectionServices;
++ (instancetype)DVTFoundation;
++ (instancetype)IDEFoundation;
++ (instancetype)IDEiOSSupportCore;
++ (instancetype)IBAutolayoutFoundation;
++ (instancetype)IDEKit;
++ (instancetype)IDESourceEditor;
++ (instancetype)DFRSupportKit;
++ (instancetype)DVTKit;
 
 /**
  XCTest framework for MacOSX
@@ -27,9 +37,16 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)XCTest;
 
 /**
+ Frameworks bundled with the 'Apple Configuration' App
+ */
++ (instancetype)ConfigurationUtilityKit;
++ (instancetype)ConfigurationProfile;
+
+/**
  System Private Frameworks
  */
 + (instancetype)MobileDevice;
++ (instancetype)DeviceLink;
 
 @end
 

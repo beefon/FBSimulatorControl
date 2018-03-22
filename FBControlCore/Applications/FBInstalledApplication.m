@@ -1,13 +1,15 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBInstalledApplication.h"
 
-#import "FBBundleDescriptor.h"
+#import "FBApplicationBundle.h"
 
 FBApplicationInstallTypeString const FBApplicationInstallTypeStringUnknown = @"unknown";
 FBApplicationInstallTypeString const FBApplicationInstallTypeStringSystem = @"system";
@@ -26,17 +28,17 @@ FBApplicationInstallInfoKey const FBApplicationInstallInfoKeySignerIdentity = @"
 
 #pragma mark Initializers
 
-+ (instancetype)installedApplicationWithBundle:(FBBundleDescriptor *)bundle installType:(FBApplicationInstallType)installType
++ (instancetype)installedApplicationWithBundle:(FBApplicationBundle *)bundle installType:(FBApplicationInstallType)installType
 {
   return [self installedApplicationWithBundle:bundle installType:installType dataContainer:nil];
 }
 
-+ (instancetype)installedApplicationWithBundle:(FBBundleDescriptor *)bundle installType:(FBApplicationInstallType)installType dataContainer:(NSString *)dataContainer
++ (instancetype)installedApplicationWithBundle:(FBApplicationBundle *)bundle installType:(FBApplicationInstallType)installType dataContainer:(NSString *)dataContainer
 {
   return [[self alloc] initWithBundle:bundle installType:installType dataContainer:dataContainer];
 }
 
-- (instancetype)initWithBundle:(FBBundleDescriptor *)bundle installType:(FBApplicationInstallType)installType dataContainer:(NSString *)dataContainer
+- (instancetype)initWithBundle:(FBApplicationBundle *)bundle installType:(FBApplicationInstallType)installType dataContainer:(NSString *)dataContainer
 {
   self = [super init];
   if (!self) {

@@ -1,14 +1,15 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
 
 #import <FBControlCore/FBJSONConversion.h>
-#import <FBControlCore/FBBinaryParser.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -17,43 +18,52 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @interface FBBinaryDescriptor : NSObject <NSCopying, FBJSONSerializable, FBJSONDeserializable>
 
-#pragma mark Initializers
-
 /**
  The Designated Initializer.
 
  @param name The name of the executable. Must not be nil.
- @param architectures The supported architectures of the executable. Must not be nil.
  @param path The path to the executable. Must not be nil.
+ @param architectures The supported architectures of the executable. Must not be nil.
  @return a new FBBinaryDescriptor instance.
  */
-- (instancetype)initWithName:(NSString *)name architectures:(NSSet<FBBinaryArchitecture> *)architectures path:(NSString *)path;
+- (instancetype)initWithName:(NSString *)name path:(NSString *)path architectures:(NSSet *)architectures;
 
 /**
- Returns the FBBinaryDescriptor for the given binary path, by parsing the binary.
+ An initializer for FBBinaryDescriptor that checks the nullability of the arguments
 
- @param path the path to the binary.
- @param error an error out for any error that occurs.
- @return a Binary Descriptor, if one could be parsed.
+ @param name The name of the executable. May be nil.
+ @param path The path to the executable. May be nil.
+ @param architectures The supported architectures of the executable. Must not be nil.
+ @return a new FBBinaryDescriptor instance, if all arguments are non-nil. Nil otherwise.
  */
-+ (nullable instancetype)binaryWithPath:(NSString *)path error:(NSError **)error;
-
-#pragma mark Properties
++ (nullable instancetype)withName:(NSString *)name path:(NSString *)path architectures:(NSSet *)architectures;
 
 /**
- The name of the executable.
+ The Name of the Executable.
  */
 @property (nonatomic, copy, readonly) NSString *name;
 
 /**
- The Supported Architectures of the Executable.
- */
-@property (nonatomic, copy, readonly) NSSet<FBBinaryArchitecture> *architectures;
-
-/**
- The file path to the executable.
+ The File Path to the Executable.
  */
 @property (nonatomic, copy, readonly) NSString *path;
+
+/**
+ The Supported Architectures of the Executable.
+ */
+@property (nonatomic, copy, readonly) NSSet *architectures;
+
+@end
+
+/**
+ Conveniences for building FBBinaryDescriptor instances
+ */
+@interface FBBinaryDescriptor (Helpers)
+
+/**
+ Returns the FBBinaryDescriptor for the given binary path
+ */
++ (nullable instancetype)binaryWithPath:(NSString *)path error:(NSError **)error;
 
 @end
 

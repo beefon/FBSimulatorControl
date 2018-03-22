@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -63,14 +65,6 @@ typedef struct {
 + (instancetype)strategyWithProcessFetcher:(FBProcessFetcher *)processFetcher workQueue:(dispatch_queue_t)workQueue logger:(id<FBControlCoreLogger>)logger;
 
 #pragma mark Public Methods
-
-/**
- Terminates a Process of the provided pid
-
- @param processIdentifier the pid of the process to kill.
- @return a Future that resolves when the process was killed.
- */
-- (FBFuture<NSNull *> *)killProcessIdentifier:(pid_t)processIdentifier;
 
 /**
  Terminates a Process of the provided Process Info.

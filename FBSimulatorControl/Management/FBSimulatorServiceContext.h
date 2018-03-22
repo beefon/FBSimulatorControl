@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -13,8 +15,6 @@
 @class SimRuntime;
 @class SimServiceContext;
 
-@protocol FBControlCoreLogger;
-
 NS_ASSUME_NONNULL_BEGIN
 
 /**
@@ -22,24 +22,10 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @interface FBSimulatorServiceContext : NSObject
 
-#pragma mark Initializers
-
 /**
- Returns the shared Service Context instance.
-
- @param logger the logger to use.
- @return the shared context.
- */
-+ (instancetype)sharedServiceContextWithLogger:(nullable id<FBControlCoreLogger>)logger;
-
-/**
- Returns the shared Service Context instance.
-
- @return the shared context.
+ Returns the Current SimSericeContext.
  */
 + (instancetype)sharedServiceContext;
-
-#pragma mark Public Methods
 
 /**
  Return the paths to all of the device sets.

@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestBaseRunner.h"
@@ -23,6 +25,7 @@
 
 @property (nonatomic, strong, readonly) FBXCTestCommandLine *commandLine;
 @property (nonatomic, strong, readonly) FBXCTestContext *context;
+@property (nonatomic, copy, readonly) NSString *simulatorSetPath;
 
 @end
 
@@ -30,12 +33,12 @@
 
 #pragma mark Initializers
 
-+ (instancetype)testRunnerWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context
++ (instancetype)testRunnerWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context simulatorSetPath:(NSString *)simulatorSetPath
 {
-  return [[self alloc] initWithCommandLine:commandLine context:context];
+  return [[self alloc] initWithCommandLine:commandLine context:context simulatorSetPath:simulatorSetPath];
 }
 
-- (instancetype)initWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context
+- (instancetype)initWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context simulatorSetPath:(NSString *)simulatorSetPath
 {
   self = [super init];
   if (!self) {
@@ -44,6 +47,7 @@
 
   _commandLine = commandLine;
   _context = context;
+  _simulatorSetPath = [simulatorSetPath copy];
 
   return self;
 }
@@ -52,16 +56,17 @@
 
 - (FBFuture<NSNull *> *)execute
 {
-  FBFuture<NSNull *> *future = [self.commandLine.destination isKindOfClass:FBXCTestDestinationiPhoneSimulator.class] ? [self runiOSTest] : [self runMacTest];
-  return [[future
-    timeout:self.commandLine.globalTimeout waitingFor:@"entire test execution to finish"]
-    onQueue:dispatch_get_main_queue() fmap:^ FBFuture<NSNull *> * (id _) {
-      NSError *error = nil;
-      if (![self.context.reporter printReportWithError:&error]) {
-        return [FBFuture futureWithError:error];
-      }
-      return FBFuture.empty;
-    }];
+  FBFuture<NSNull *> *testExecutingFuture = [self.commandLine.destination isKindOfClass:FBXCTestDestinationiPhoneSimulator.class] ? [self runiOSTest] : [self runMacTest];
+  return [[testExecutingFuture
+          timeout:self.commandLine.globalTimeout waitingFor:@"entire test execution to finish"]
+          onQueue:dispatch_get_main_queue()
+          chain:^FBFuture * _Nonnull(FBFuture * _Nonnull aFuture) {
+            NSError *error = nil;
+            if (![self.context.reporter printReportWithError:&error]) {
+              return [FBFuture futureWithError:error];
+            }
+            return aFuture;
+          }];
 }
 
 #pragma mark Private
@@ -92,7 +97,7 @@
 - (FBFuture<NSNull *> *)runiOSTest
 {
   return [[[self.context
-    simulatorForCommandLine:self.commandLine]
+    simulatorForCommandLine:self.commandLine simulatorSetPath:self.simulatorSetPath]
     timeout:self.commandLine.testPreparationTimeout waitingFor:@"Simulator to be fetched for a test"]
     onQueue:dispatch_get_main_queue() fmap:^(FBSimulator *simulator) {
       return [[self

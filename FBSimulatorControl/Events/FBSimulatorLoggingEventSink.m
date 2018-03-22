@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorLoggingEventSink.h"
@@ -12,6 +14,12 @@
 #import "FBSimulator.h"
 #import "FBSimulatorAgentOperation.h"
 #import "FBSimulatorApplicationOperation.h"
+
+NSString *BoolDescription(BOOL b);
+NSString *BoolDescription(BOOL b)
+{
+  return b ? @"YES" : @"NO";
+}
 
 @interface FBSimulatorLoggingEventSink ()
 
@@ -49,7 +57,7 @@
 
 - (void)containerApplicationDidTerminate:(FBProcessInfo *)applicationProcess expected:(BOOL)expected
 {
-  [self.logger logFormat:@"Container Application Did Terminate => %@ Expected %d", applicationProcess.shortDescription, expected];
+  [self.logger logFormat:@"Container Application Did Terminate => %@, Expected = %@", applicationProcess.shortDescription, BoolDescription(expected)];
 }
 
 - (void)connectionDidConnect:(FBSimulatorConnection *)connection
@@ -59,7 +67,7 @@
 
 - (void)connectionDidDisconnect:(FBSimulatorConnection *)connection expected:(BOOL)expected
 {
-  [self.logger logFormat:@"Connection Did Disconnect => %@ Expected %d", connection, expected];
+  [self.logger logFormat:@"Connection Did Disconnect => %@, Expected %@", connection, BoolDescription(expected)];
 }
 
 - (void)simulatorDidLaunch:(FBProcessInfo *)launchdProcess
@@ -69,7 +77,7 @@
 
 - (void)simulatorDidTerminate:(FBProcessInfo *)launchdProcess expected:(BOOL)expected
 {
-  [self.logger logFormat:@"Simulator Did Terminate => %@ Expected %d", launchdProcess.shortDescription, expected];
+  [self.logger logFormat:@"Simulator Did Terminate => %@ Expected = %@", launchdProcess.shortDescription, BoolDescription(expected)];
 }
 
 - (void)agentDidLaunch:(FBSimulatorAgentOperation *)operation
@@ -89,7 +97,7 @@
 
 - (void)applicationDidTerminate:(FBSimulatorApplicationOperation *)operation expected:(BOOL)expected
 {
-  [self.logger logFormat:@"Application Did Terminate => Expected %d %@", expected, operation];
+  [self.logger logFormat:@"Application Did Terminate => Expected %@ %@", BoolDescription(expected), operation];
 }
 
 - (void)didChangeState:(FBiOSTargetState)state

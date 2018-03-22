@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorControlAssertions.h"
@@ -22,7 +24,7 @@
   XCTAssertNil(error);
   XCTAssertTrue(success);
 
-  [[simulator erase] await:&error];
+  [[simulator.pool freeSimulator:simulator] await:&error];
   XCTAssertNil(error);
   XCTAssertTrue(success);
   [self assertSimulatorShutdown:simulator];
@@ -89,8 +91,8 @@
       describeFormat:@"Configuration %@ does not meet the runtime requirements with error %@", configuration, error]
       failFuture];
   }
-  return [[self.control.set
-    createSimulatorWithConfiguration:configuration]
+  return [[self.control.pool
+    allocateSimulatorWithConfiguration:configuration options:self.allocationOptions]
     onQueue:dispatch_get_main_queue() chain:^(FBFuture *future) {
       if (future.error) {
         XCTFail(@"Error in device allocation %@", future.error);
@@ -109,7 +111,7 @@
   return [self assertObtainsBootedSimulatorWithConfiguration:self.simulatorConfiguration bootConfiguration:self.bootConfiguration];
 }
 
-- (nullable FBSimulator *)assertObtainsBootedSimulatorWithInstalledApplication:(FBBundleDescriptor *)application
+- (nullable FBSimulator *)assertObtainsBootedSimulatorWithInstalledApplication:(FBApplicationBundle *)application
 {
   FBSimulator *simulator = [self assertObtainsBootedSimulator];
   if (!simulator) {
@@ -136,7 +138,7 @@
   return simulator;
 }
 
-- (nullable FBSimulator *)assertSimulator:(FBSimulator *)simulator installs:(FBBundleDescriptor *)application
+- (nullable FBSimulator *)assertSimulator:(FBSimulator *)simulator installs:(FBApplicationBundle *)application
 {
   NSError *error = nil;
   BOOL success = [[simulator installApplicationWithPath:application.path] await:&error] != nil;

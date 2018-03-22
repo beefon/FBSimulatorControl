@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBSimulatorBitmapStream.h"
@@ -169,12 +171,12 @@ static NSDictionary<NSString *, id> *FBBitmapStreamPixelBufferAttributesFromPixe
   return [FBFuture onQueue:self.writeQueue resolve:^{
     if ([self.framebuffer isConsumerAttached:self]) {
       [self.logger logFormat:@"Already attached %@ as a consumer", self];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }
     // If we have a surface now, we can start rendering, so mount the surface.
     IOSurfaceRef surface = [self.framebuffer attachConsumer:self onQueue:self.writeQueue];
     [self didChangeIOSurface:surface];
-    return FBFuture.empty;
+    return [FBFuture futureWithResult:NSNull.null];
   }];
 }
 

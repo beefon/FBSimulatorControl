@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBTestBundle.h"
@@ -26,6 +28,7 @@
 @property (nonatomic, copy) NSSet<NSString *> *testsToSkip;
 @property (nonatomic, copy) NSString *targetApplicationBundleID;
 @property (nonatomic, copy) NSString *targetApplicationPath;
+@property (nonatomic, copy) NSDictionary<NSString *, NSString *> *testApplicationDependencies;
 @property (nonatomic, copy) NSString *automationFrameworkPath;
 @end
 
@@ -67,6 +70,12 @@
   return self;
 }
 
+- (instancetype)withTestApplicationDependencies:(NSDictionary<NSString *, NSString *> *)testApplicationDependencies
+{
+  self.testApplicationDependencies = [testApplicationDependencies copy];
+  return self;
+}
+
 - (instancetype)withAutomationFrameworkPath:(NSString *)automationFrameworkPath
 {
   self.automationFrameworkPath = automationFrameworkPath;
@@ -86,17 +95,22 @@
   }
   if (self.sessionIdentifier) {
     NSError *innerError;
+    // module name cannot have - and ., but usually it matches the bundle name.
+    NSString *moduleName = [[testBundle.name
+                             stringByReplacingOccurrencesOfString:@"-" withString:@"_"]
+                            stringByReplacingOccurrencesOfString:@"." withString:@"_"];
     NSString *testConfigurationFileName = [NSString stringWithFormat:@"%@-%@.xctestconfiguration", testBundle.name, self.sessionIdentifier.UUIDString];
     testBundle.configuration = [FBTestConfiguration
       configurationWithFileManager:self.fileManager
       sessionIdentifier:self.sessionIdentifier
-      moduleName:testBundle.name
+      moduleName:moduleName
       testBundlePath:testBundle.path
       uiTesting:self.shouldInitializeForUITesting
       testsToRun:self.testsToRun
       testsToSkip:self.testsToSkip
       targetApplicationPath:self.targetApplicationPath
       targetApplicationBundleID:self.targetApplicationBundleID
+      testApplicationDependencies:self.testApplicationDependencies
       automationFrameworkPath:self.automationFrameworkPath
       savePath:[testBundle.path stringByAppendingPathComponent:testConfigurationFileName]
       error:&innerError];

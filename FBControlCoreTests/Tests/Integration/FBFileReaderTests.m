@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -29,8 +31,8 @@
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  id<FBAccumulatingBuffer> consumer = FBDataBuffer.accumulatingBuffer;
-  FBFileReader *reader = [FBFileReader readerWithFileDescriptor:pipe.fileHandleForReading.fileDescriptor closeOnEndOfFile:NO consumer:consumer logger:nil];
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer logger:nil];
   XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
@@ -62,7 +64,7 @@
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  FBFileReader *reader = [FBFileReader readerWithFileDescriptor:pipe.fileHandleForReading.fileDescriptor closeOnEndOfFile:NO consumer:self logger:nil];
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:self logger:nil];
   XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
@@ -129,8 +131,8 @@
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  id<FBAccumulatingBuffer> consumer = FBDataBuffer.accumulatingBuffer;
-  FBFileReader *reader = [FBFileReader readerWithFileDescriptor:pipe.fileHandleForReading.fileDescriptor closeOnEndOfFile:NO consumer:consumer logger:nil];
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer logger:nil];
   XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
@@ -164,8 +166,8 @@
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  id<FBAccumulatingBuffer> consumer = FBDataBuffer.accumulatingBuffer;
-  FBFileReader *reader = [FBFileReader readerWithFileDescriptor:pipe.fileHandleForReading.fileDescriptor closeOnEndOfFile:NO consumer:consumer logger:nil];
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer logger:nil];
   XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
@@ -351,7 +353,7 @@
 - (void)testAttemptingToReadAGarbageFileDescriptor
 {
   // Setup
-  FBFileReader *reader = [FBFileReader readerWithFileDescriptor:92123 closeOnEndOfFile:NO consumer:self logger:nil];
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:[[NSFileHandle alloc] initWithFileDescriptor:92123 closeOnDealloc:NO] consumer:self logger:nil];
   XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading, the start is asyncrhonous, so we can't know ahead of time if the fd is bad.

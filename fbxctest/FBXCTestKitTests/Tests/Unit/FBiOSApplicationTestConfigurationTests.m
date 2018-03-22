@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBXCTestKitFixtures.h"
@@ -39,7 +41,7 @@
                                      @"-only", testFilter];
 
   NSError *error;
-  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory error:&error];
+  FBXCTestCommandLine *commandLine = [FBXCTestCommandLine commandLineFromArguments:arguments processUnderTestEnvironment:processEnvironment workingDirectory:workingDirectory timeout:0 logger:nil error:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(commandLine);
 
@@ -53,7 +55,7 @@
   [self assertValueSemanticsOfConfiguration:configuration];
 
   FBTestManagerTestConfiguration *testManagerTestConfiguration = (FBTestManagerTestConfiguration *)configuration;
-  XCTAssertEqualObjects(testManagerTestConfiguration.testFilter, shortTestFilter);
+  XCTAssertEqualObjects(testManagerTestConfiguration.testFilters, shortTestFilter);
 }
 
 @end

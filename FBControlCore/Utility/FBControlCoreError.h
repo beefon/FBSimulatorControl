@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <CoreGraphics/CoreGraphics.h>
@@ -44,10 +46,9 @@ extern NSString *const FBControlCoreErrorDomain;
  For returning early from failing conditions.
  */
 - (BOOL)failBool:(NSError **)error;
-- (int)failInt:(NSError **)error;
 - (unsigned int)failUInt:(NSError **)error;
 - (CGRect)failRect:(NSError **)error;
-- (nullable void *)failPointer:(NSError **)error;
+- (void *)failPointer:(NSError **)error;
 - (nullable id)fail:(NSError **)error;
 - (FBFuture *)failFuture;
 - (FBFutureContext *)failFutureContext;

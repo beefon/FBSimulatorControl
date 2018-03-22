@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -22,7 +24,7 @@
   [[NSFileManager defaultManager] createFileAtPath:temporaryFilePath contents:nil attributes:nil];
   NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:temporaryFilePath];
 
-  id<FBControlCoreLogger> logger = [FBControlCoreLogger loggerToFileDescriptor:fileHandle.fileDescriptor closeOnEndOfFile:NO];
+  id<FBControlCoreLogger> logger = [FBControlCoreLogger loggerToFileHandle:fileHandle];
   [logger log:@"Some content"];
   [fileHandle synchronizeFile];
   [fileHandle closeFile];
@@ -35,7 +37,7 @@
 
 - (void)testLoggingToConsumer
 {
-  id<FBConsumableBuffer> consumer = FBDataBuffer.consumableBuffer;
+  id<FBConsumableBuffer> consumer = FBLineBuffer.consumableBuffer;
   id<FBControlCoreLogger> logger = [FBControlCoreLogger loggerToConsumer:consumer];
 
   [logger log:@"HELLO"];
@@ -55,7 +57,7 @@
 
 - (void)testThreadSafetyOfConsumableLogger
 {
-  id<FBConsumableBuffer> consumer = FBDataBuffer.consumableBuffer;
+  id<FBConsumableBuffer> consumer = FBLineBuffer.consumableBuffer;
   id<FBControlCoreLogger> logger = [FBControlCoreLogger loggerToConsumer:consumer];
 
   dispatch_group_t group = dispatch_group_create();

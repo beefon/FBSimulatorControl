@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -143,10 +145,15 @@ extern FBXCTestType const FBXCTestTypeListTest;
 @property (nonatomic, copy, readonly, nullable) NSString *testTargetAppPath;
 
 /**
- The test filter for which test to run.
+ The Paths to the additional Applications that can be launched during tests.
+ */
+@property (nonatomic, copy, readonly, nullable) NSArray<NSString *> *additionalApplicationPaths;
+
+/**
+ The test filters for which test to run.
  Format: <testClass>/<testMethod>
  */
-@property (nonatomic, copy, readonly, nullable) NSString *testFilter;
+@property (nonatomic, copy, readonly, nullable) NSArray<NSString *> *testFilters;
 
 /**
  The path of log file that we dump all os_log to.
@@ -154,6 +161,9 @@ extern FBXCTestType const FBXCTestTypeListTest;
  we use this name to avoid confusing between various logging systems)
  */
 @property (nonatomic, copy, readonly, nullable) NSString *osLogPath;
+
+@property (nonatomic, copy, readonly, nullable) NSString *runnerAppLogPath;
+@property (nonatomic, copy, readonly, nullable) NSString *applicationLogPath;
 
 /**
  The path of video recording file that record the whole test run.
@@ -170,7 +180,7 @@ extern FBXCTestType const FBXCTestTypeListTest;
 /**
  The Designated Initializer.
  */
-+ (instancetype)configurationWithShims:(FBXCTestShimConfiguration *)shims environment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory testBundlePath:(NSString *)testBundlePath waitForDebugger:(BOOL)waitForDebugger timeout:(NSTimeInterval)timeout runnerAppPath:(NSString *)runnerAppPath testTargetAppPath:(nullable NSString *)testTargetAppPath testFilter:(nullable NSString *)testFilter videoRecordingPath:(nullable NSString *)videoRecordingPath testArtifactsFilenameGlobs:(nullable NSArray<NSString *> *)testArtifactsFilenameGlobs osLogPath:(nullable NSString *)osLogPath;
++ (instancetype)configurationWithShims:(FBXCTestShimConfiguration *)shims environment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory testBundlePath:(NSString *)testBundlePath waitForDebugger:(BOOL)waitForDebugger timeout:(NSTimeInterval)timeout runnerAppPath:(NSString *)runnerAppPath testTargetAppPath:(nullable NSString *)testTargetAppPath testFilters:(NSArray<NSString *> *)testFilters videoRecordingPath:(nullable NSString *)videoRecordingPath testArtifactsFilenameGlobs:(nullable NSArray<NSString *> *)testArtifactsFilenameGlobs osLogPath:(nullable NSString *)osLogPath additionalApplicationPaths:(NSArray<NSString *> *)additionalApplicationPaths runnerAppLogPath:(nullable NSString *)runnerAppLogPath applicationLogPath:(nullable NSString *)applicationLogPath;
 
 @end
 
@@ -189,9 +199,9 @@ typedef NS_OPTIONS(NSUInteger, FBLogicTestMirrorLogs) {
 @interface FBLogicTestConfiguration : FBXCTestConfiguration
 
 /**
- The Filter for Logic Tests.
+ The Filters for Logic Tests.
  */
-@property (nonatomic, copy, nullable, readonly) NSString *testFilter;
+@property (nonatomic, copy, nullable, readonly) NSArray<NSString *> *testFilters;
 
 /**
  How the logic test logs will be mirrored
@@ -201,7 +211,7 @@ typedef NS_OPTIONS(NSUInteger, FBLogicTestMirrorLogs) {
 /**
  The Designated Initializer.
  */
-+ (instancetype)configurationWithShims:(FBXCTestShimConfiguration *)shims environment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory testBundlePath:(NSString *)testBundlePath waitForDebugger:(BOOL)waitForDebugger timeout:(NSTimeInterval)timeout testFilter:(nullable NSString *)testFilter mirroring:(FBLogicTestMirrorLogs)mirroring;
++ (instancetype)configurationWithShims:(FBXCTestShimConfiguration *)shims environment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory testBundlePath:(NSString *)testBundlePath waitForDebugger:(BOOL)waitForDebugger timeout:(NSTimeInterval)timeout testFilters:(nullable NSArray<NSString *> *)testFilters mirroring:(FBLogicTestMirrorLogs)mirroring;
 
 @end
 

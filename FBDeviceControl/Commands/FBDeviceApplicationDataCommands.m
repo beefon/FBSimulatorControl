@@ -1,8 +1,12 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBDeviceApplicationDataCommands.h"
@@ -82,7 +86,7 @@
         causedBy:error]
         failFuture];
      }
-     return FBFuture.empty;
+     return [FBFuture futureWithResult:NSNull.null];
    }];
 }
 
@@ -97,27 +101,23 @@
   }];
 }
 
-- (FBFuture<NSNull *> *)movePaths:(NSArray<NSString *> *)originPaths toPath:(NSString *)destinationPath inContainerOfApplication:(NSString *)bundleID
+- (FBFuture<NSNull *> *)movePath:(NSString *)originPath toPath:(NSString *)destinationPath inContainerOfApplication:(NSString *)bundleID
 {
   return [self handleWithAFCSessionForBundleID:bundleID operationBlock:^ NSNull * (FBAFCConnection *afc, NSError **error) {
-    for (NSString *originPath in originPaths) {
-      BOOL success = [afc renamePath:originPath destination:destinationPath error:error];
-      if (!success) {
-        return nil;
-      }
+    BOOL success = [afc renamePath:originPath destination:destinationPath error:error];
+    if (!success) {
+      return nil;
     }
     return NSNull.null;
   }];
 }
 
-- (FBFuture<NSNull *> *)removePaths:(NSArray<NSString *> *)paths inContainerOfApplication:(NSString *)bundleID
+- (FBFuture<NSNull *> *)removePath:(NSString *)path inContainerOfApplication:(NSString *)bundleID
 {
   return [self handleWithAFCSessionForBundleID:bundleID operationBlock:^ NSNull * (FBAFCConnection *afc, NSError **error) {
-    for (NSString *path in paths) {
-      BOOL success = [afc removePath:path recursively:YES error:error];
-      if (!success) {
-        return nil;
-      }
+    BOOL success = [afc removePath:path recursively:YES error:error];
+    if (!success) {
+      return nil;
     }
     return NSNull.null;
   }];

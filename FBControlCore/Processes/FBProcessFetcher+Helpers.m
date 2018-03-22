@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBProcessFetcher+Helpers.h"
@@ -11,7 +13,7 @@
 
 #import "FBProcessInfo.h"
 #import "FBControlCoreError.h"
-#import "FBFuture+Sync.h"
+#import "NSRunLoop+FBControlCore.h"
 #import "FBBinaryDescriptor.h"
 #import "FBDispatchSourceNotifier.h"
 
@@ -44,23 +46,12 @@
   return [processes copy];
 }
 
-- (BOOL)processIdentifierExists:(pid_t)processIdentifier error:(NSError **)error
-{
-  FBProcessInfo *actual = [self processInfoFor:processIdentifier];
-  if (!actual) {
-    return [[FBControlCoreError
-      describeFormat:@"Could not find the with pid %d", processIdentifier]
-      failBool:error];
-  }
-  return YES;
-}
-
 - (BOOL)processExists:(FBProcessInfo *)process error:(NSError **)error
 {
   FBProcessInfo *actual = [self processInfoFor:process.processIdentifier];
   if (!actual) {
     return [[FBControlCoreError
-      describeFormat:@"Could not find the with pid %d", process.processIdentifier]
+      describeFormat:@"Could not find the processs for %@ with pid %d", process.shortDescription, process.processIdentifier]
       failBool:error];
   }
   if (![process.launchPath isEqualToString:actual.launchPath]) {
@@ -71,10 +62,10 @@
   return YES;
 }
 
-- (FBFuture<NSNull *> *)onQueue:(dispatch_queue_t)queue waitForProcessIdentifierToDie:(pid_t)processIdentifier
+- (FBFuture<NSNull *> *)onQueue:(dispatch_queue_t)queue waitForProcessToDie:(FBProcessInfo *)process
 {
-  return [FBFuture onQueue:queue resolveWhen:^ BOOL {
-    FBProcessInfo *polledProcess = [self processInfoFor:processIdentifier];
+  return [FBFuture onQueue:queue resolveWhen:^BOOL{
+    FBProcessInfo *polledProcess = [self processInfoFor:process.processIdentifier];
     return polledProcess == nil;
   }];
 }

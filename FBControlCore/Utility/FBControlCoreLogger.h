@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <Foundation/Foundation.h>
@@ -122,13 +124,12 @@ typedef NS_ENUM(NSUInteger, FBControlCoreLogLevel) {
 + (id<FBControlCoreLogger>)loggerToConsumer:(id<FBDataConsumer>)consumer;
 
 /**
- Log to a File Descriptor.
+ Log to a File Handle.
 
- @param fileDescriptor the file descriptor to write to.
- @param closeOnEndOfFile YES if the file descriptor should be closed on consumeEndOfFile, NO otherwise.
+ @param fileHandle the file handle to write to.
  @return a logger instance.
  */
-+ (id<FBControlCoreLogger>)loggerToFileDescriptor:(int)fileDescriptor closeOnEndOfFile:(BOOL)closeOnEndOfFile;
++ (id<FBControlCoreLogger>)loggerToFileHandle:(NSFileHandle *)fileHandle;
 
 /**
  Strips the newline and returns a nullable string if the string shouldn't be logged.

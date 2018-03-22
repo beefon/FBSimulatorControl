@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -191,36 +193,6 @@
   XCTAssertEqualObjects(compositeFuture.result, (@[]));
 }
 
-- (void)testCompositeFailure
-{
-  NSError *error = [NSError errorWithDomain:@"foo" code:2 userInfo:nil];
-  FBMutableFuture<id> *pending = FBMutableFuture.future;
-  FBFuture<NSArray<NSNumber *> *> *compositeFuture = [FBFuture futureWithFutures:@[
-    [FBFuture futureWithResult:@0],
-    pending,
-    [FBMutableFuture futureWithError:error],
-  ]];
-
-  XCTAssertEqual(compositeFuture.state, FBFutureStateFailed);
-  XCTAssertEqualObjects(compositeFuture.error, error);
-  XCTAssertEqual(pending.state, FBFutureStateRunning);
-}
-
-- (void)testCompositeCancellation
-{
-  FBMutableFuture<id> *pending = FBMutableFuture.future;
-  FBMutableFuture<id> *cancelled = FBMutableFuture.future;
-  [cancelled cancel];
-  FBFuture<NSArray<NSNumber *> *> *compositeFuture = [FBFuture futureWithFutures:@[
-    [FBFuture futureWithResult:@0],
-    pending,
-    cancelled,
-  ]];
-
-  XCTAssertEqual(compositeFuture.state, FBFutureStateCancelled);
-  XCTAssertEqual(pending.state, FBFutureStateRunning);
-}
-
 - (void)testFmappedSuccess
 {
   XCTestExpectation *step1 = [[XCTestExpectation alloc] initWithDescription:@"fmap 1 is called"];
@@ -376,58 +348,48 @@
   XCTAssertEqualObjects(chainFuture.result, @4);
 }
 
-- (void)testChainingToHandleCancellation
+- (void)testChainValueThenCancel
 {
-  XCTestExpectation *completion = [[XCTestExpectation alloc] initWithDescription:@"completion is called"];
-  XCTestExpectation *chained = [[XCTestExpectation alloc] initWithDescription:@"chain is called"];
-  XCTestExpectation *remapped = [[XCTestExpectation alloc] initWithDescription:@"fmap on handling cancellation"];
+  XCTestExpectation *completion = [[XCTestExpectation alloc] initWithDescription:@"Completion is called"];
 
   FBMutableFuture<NSNumber *> *baseFuture = FBMutableFuture.future;
   FBFuture<NSNumber *> *chainFuture = [[[baseFuture
     onQueue:self.queue chain:^(FBFuture *future) {
-      [chained fulfill];
+      XCTFail(@"Chain Should Not be called for cancelled future");
       return [FBFuture futureWithResult:@2];
     }]
     onQueue:self.queue fmap:^(id _) {
-      [remapped fulfill];
-      return [FBFuture futureWithResult:@3];
+     XCTFail(@"fmap Should Not be called for cancelled future");
+     return [FBFuture futureWithResult:@3];
     }]
     onQueue:self.queue notifyOfCompletion:^(FBFuture *future) {
-      XCTAssertEqual(future.state, FBFutureStateDone);
-      XCTAssertEqual(future.result, @3);
+      XCTAssertEqual(future.state, FBFutureStateCancelled);
       [completion fulfill];
     }];
   dispatch_async(self.queue, ^{
     [baseFuture cancel];
   });
 
-  [self waitForExpectations:@[completion, chained, remapped] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
-  XCTAssertEqual(chainFuture.state, FBFutureStateDone);
-  XCTAssertEqual(chainFuture.result, @3);
+  [self waitForExpectations:@[completion] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
+  XCTAssertEqual(chainFuture.state, FBFutureStateCancelled);
 }
 
-- (void)testUnhandledCancellationWillPropogate
+- (void)testChainedCancellation
 {
-  XCTestExpectation *firstChain = [[XCTestExpectation alloc] initWithDescription:@"first chain is called"];
-  XCTestExpectation *secondChain = [[XCTestExpectation alloc] initWithDescription:@"second chain is called"];
-  XCTestExpectation *completion = [[XCTestExpectation alloc] initWithDescription:@"completion is called"];
+  XCTestExpectation *chain = [[XCTestExpectation alloc] initWithDescription:@"chain is called"];
+  XCTestExpectation *completion = [[XCTestExpectation alloc] initWithDescription:@"Completion is called"];
 
   FBMutableFuture<NSNumber *> *baseFuture = FBMutableFuture.future;
-  FBFuture<NSNumber *> *chainFuture = [[[[baseFuture
+  FBFuture<NSNumber *> *chainFuture = [[[baseFuture
     onQueue:self.queue chain:^(FBFuture *_) {
-      [firstChain fulfill];
+      [chain fulfill];
       FBMutableFuture *future = FBMutableFuture.future;
       [future cancel];
       return future;
     }]
-    onQueue:self.queue chain:^(FBFuture *future) {
-      XCTAssertEqual(future.state, FBFutureStateCancelled);
-      [secondChain fulfill];
-      return future;
-    }]
-    onQueue:self.queue fmap:^(id _) {
-      XCTFail(@"fmap should not be called");
-      return FBMutableFuture.future;
+    onQueue:self.queue chain:^(id _) {
+      XCTFail(@"chain Should Not be called for cancelled future");
+      return [FBFuture futureWithResult:@3];
     }]
     onQueue:self.queue notifyOfCompletion:^(FBFuture *future) {
       XCTAssertEqual(future.state, FBFutureStateCancelled);
@@ -437,7 +399,7 @@
     [baseFuture resolveWithResult:@0];
   });
 
-  [self waitForExpectations:@[firstChain, secondChain, completion] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
+  [self waitForExpectations:@[chain, completion] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
   XCTAssertEqual(chainFuture.state, FBFutureStateCancelled);
 }
 
@@ -708,7 +670,7 @@
     future]
     onQueue:self.queue respondToCancellation:^{
       [respondCalled fulfill];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 
   [[future
@@ -729,7 +691,7 @@
     future]
     onQueue:self.queue respondToCancellation:^{
       [respondCalled fulfill];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }];
 
   FBFuture<NSNull *> *cancelledFirstTime = [future cancel];
@@ -747,11 +709,11 @@
     future]
     onQueue:self.queue respondToCancellation:^{
       [firstCancelCalled fulfill];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }]
     onQueue:self.queue respondToCancellation:^{
       [secondCancelCalled fulfill];
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }]
     onQueue:self.queue notifyOfCompletion:^(FBFuture<NSNull *> *completionFuture) {
       XCTAssertEqual(completionFuture.state, FBFutureStateCancelled);
@@ -770,7 +732,7 @@
   [[baseFuture
     onQueue:self.queue respondToCancellation:^{
       XCTFail(@"Cancellation should not have been called");
-      return FBFuture.empty;
+      return [FBFuture futureWithResult:NSNull.null];
     }]
     onQueue:self.queue notifyOfCompletion:^(FBFuture<NSNull *> *completionFuture) {
       XCTAssertEqual(completionFuture.state, FBFutureStateDone);
@@ -853,7 +815,6 @@
       XCTAssertEqual(state, FBFutureStateDone);
       teardownCalled = YES;
       [teardownExpectation fulfill];
-      return FBFuture.empty;
     }]
     onQueue:self.queue pend:^(id value) {
       XCTAssertEqualObjects(value, @1);
@@ -893,7 +854,6 @@
       XCTAssertEqual(state, FBFutureStateDone);
       outerTeardownCalled = YES;
       [outerTeardownExpectation fulfill];
-      return [FBFuture.empty delay:1];
     }]
     onQueue:self.queue push:^(id value) {
       XCTAssertEqualObjects(value, @1);
@@ -903,7 +863,6 @@
         XCTAssertEqual(innerState, FBFutureStateDone);
         innerTeardownCalled = YES;
         [innerTeardownExpectation fulfill];
-        return FBFuture.empty;
       }];
     }]
     onQueue:self.queue pop:^(id value) {
@@ -940,7 +899,6 @@
       XCTAssertEqual(state, FBFutureStateDone);
       initialTeardownCalled = YES;
       [initialTeardownExpectation fulfill];
-      return [FBFuture empty];
     }]
     onQueue:self.queue contextualTeardown:^(id value, FBFutureState state){
       XCTAssertTrue(popCalled);
@@ -949,7 +907,6 @@
       XCTAssertEqual(state, FBFutureStateDone);
       subsequentTeardownCalled = YES;
       [subsequentTeardownExpectation fulfill];
-      return [FBFuture.empty delay:1];
     }]
     onQueue:self.queue pop:^(id value) {
       XCTAssertFalse(initialTeardownCalled);
@@ -985,14 +942,12 @@
         XCTAssertEqual(state, FBFutureStateFailed);
         outerTeardownCalled = YES;
         [outerTeardownExpectation fulfill];
-        return FBFuture.empty;
     }]
     onQueue:self.queue push:^(id value) {
       pushCalled = YES;
       XCTAssertEqualObjects(value, @1);
       return [[FBFuture futureWithError:error] onQueue:self.queue contextualTeardown:^(id innerValue, FBFutureState innerState) {
         XCTFail(@"Should not resolve error teardown");
-        return FBFuture.empty;
       }];
     }]
     onQueue:self.queue pop:^(id result) {
@@ -1025,7 +980,6 @@
           XCTAssertEqual(state, FBFutureStateDone);
           [innerTeardownExpectation fulfill];
           teardownCalled = YES;
-          return FBFuture.empty;
         }];
     }]
     onQueue:self.queue pop:^(id value) {
@@ -1050,7 +1004,6 @@
       XCTAssertEqualObjects(value, @1);
       teardownCalled = YES;
       [teardownExpectation fulfill];
-      return FBFuture.empty;
     }]
     onQueue:self.queue enter:^(id value, FBMutableFuture<NSNull *> *innerTeardown) {
       XCTAssertEqualObjects(value, @1);

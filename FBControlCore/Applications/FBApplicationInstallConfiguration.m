@@ -1,19 +1,21 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import "FBApplicationInstallConfiguration.h"
 
-#import "FBBundleDescriptor+Application.h"
-#import "FBBundleDescriptor.h"
+#import "FBApplicationBundle+Install.h"
+#import "FBApplicationBundle.h"
 #import "FBCodesignProvider.h"
 #import "FBCollectionInformation.h"
 #import "FBControlCoreError.h"
 #import "FBControlCoreGlobalConfiguration.h"
-#import "FBFuture+Sync.h"
+#import "NSRunLoop+FBControlCore.h"
 #import "FBiOSTarget.h"
 
 FBiOSTargetFutureType const FBiOSTargetFutureTypeInstall = @"install";
@@ -107,13 +109,22 @@ static NSString *const KeyCodesign = @"codesign";
 
 - (FBFuture<id<FBiOSTargetContinuation>> *)runWithTarget:(id<FBiOSTarget>)target consumer:(id<FBDataConsumer>)consumer reporter:(id<FBEventReporter>)reporter
 {
-  return [[[FBBundleDescriptor
+  return [[[[FBApplicationBundle
     onQueue:target.asyncQueue findOrExtractApplicationAtPath:self.applicationPath logger:target.logger]
-    onQueue:target.workQueue pop:^(FBBundleDescriptor *applicationBundle) {
+    onQueue:target.workQueue pop:^FBFuture *(FBExtractedApplication *extractedApplication) {
       if (self.codesign) {
-        return [FBCodesignProvider.codeSignCommandWithAdHocIdentity recursivelySignBundleAtPath:applicationBundle.path];
+        return [[FBCodesignProvider.codeSignCommandWithAdHocIdentity
+          recursivelySignBundleAtPath:extractedApplication.bundle.path]
+          mapReplace:extractedApplication];
       }
-      return [target installApplicationWithPath:applicationBundle.path];
+      return [[target
+        installApplicationWithPath:extractedApplication.bundle.path]
+        mapReplace:extractedApplication];
+    }]
+    onQueue:target.workQueue notifyOfCompletion:^(FBFuture<FBExtractedApplication *> *future) {
+      if (future.result) {
+        [NSFileManager.defaultManager removeItemAtURL:future.result.extractedPath error:nil];
+      }
     }]
     mapReplace:FBiOSTargetContinuationDone(self.class.futureType)];
 }

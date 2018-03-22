@@ -1,8 +1,10 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
  *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  */
 
 #import <XCTest/XCTest.h>
@@ -23,15 +25,15 @@
 - (void)testCanFetchSimulatorApplications
 {
   FBSimulator *simulator = [self assertObtainsSimulator];
-  XCTAssertNotNil([FBBundleDescriptor systemApplicationNamed:@"MobileSafari" simulator:simulator error:nil]);
-  XCTAssertNotNil([FBBundleDescriptor systemApplicationNamed:@"Camera" simulator:simulator error:nil]);
-  XCTAssertNotNil([FBBundleDescriptor systemApplicationNamed:@"Maps" simulator:simulator error:nil]);
+  XCTAssertNotNil([FBApplicationBundle systemApplicationNamed:@"MobileSafari" simulator:simulator error:nil]);
+  XCTAssertNotNil([FBApplicationBundle systemApplicationNamed:@"Camera" simulator:simulator error:nil]);
+  XCTAssertNotNil([FBApplicationBundle systemApplicationNamed:@"Maps" simulator:simulator error:nil]);
 }
 
 - (void)testCreatesSampleApplication
 {
-  FBBundleDescriptor *application = self.tableSearchApplication;
-  XCTAssertEqualObjects(application.identifier, @"com.example.apple-samplecode.TableSearch");
+  FBApplicationBundle *application = self.tableSearchApplication;
+  XCTAssertEqualObjects(application.bundleID, @"com.example.apple-samplecode.TableSearch");
   XCTAssertEqualObjects(application.binary.architectures, ([NSSet setWithArray:@[@"i386", @"x86_64"]]));
 }
 
