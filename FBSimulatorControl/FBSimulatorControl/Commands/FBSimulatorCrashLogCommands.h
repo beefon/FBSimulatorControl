@@ -7,13 +7,14 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
-#import <CoreSimulator/SimDeviceIOClient.h>
+#import <Foundation/Foundation.h>
 
-@interface SimDeviceIO (Removed)
+#import <FBControlCore/FBControlCore.h>
 
-/**
- Removed in Xcode 9.0
- */
-- (void)attachConsumer:(id)arg1 toPort:(id)arg2;
+NS_ASSUME_NONNULL_BEGIN
+
+@interface FBSimulatorCrashLogCommands : NSObject <FBCrashLogCommands>
 
 @end
+
+NS_ASSUME_NONNULL_END

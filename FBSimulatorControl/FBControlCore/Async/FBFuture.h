@@ -13,6 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class FBFutureContext<T>;
 
+@protocol FBControlCoreLogger;
+
 /**
  A State for the Future.
  */
@@ -135,6 +137,16 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 - (instancetype)onQueue:(dispatch_queue_t)queue notifyOfCompletion:(void (^)(FBFuture *))handler;
 
 /**
+ Notifies of the successful resolution of the Future.
+ The handler will resolve before the chained Future.
+
+ @param queue the queue to notify on.
+ @param handler the block to invoke.
+ @return the Reciever, for chaining.
+ */
+- (instancetype)onQueue:(dispatch_queue_t)queue doOnResolved:(void (^)(T))handler;
+
+/**
  Respond to a cancellation request.
  This provides the opportunity to provide asynchronous cancellation.
  This can be called multiple times for the same reference.
@@ -192,6 +204,15 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 - (FBFutureContext<T> *)onQueue:(dispatch_queue_t)queue contextualTeardown:(void(^)(T))action;
 
 /**
+ Creates an FBFutureContext that allows a future to be mapped into a FBFutureContext.
+
+ @param queue the queue to perform the teardown on.
+ @param fmap the teardown to push
+ @return an object that acts as a proxy to the teardown.
+ */
+- (FBFutureContext *)onQueue:(dispatch_queue_t)queue pushTeardown:(FBFutureContext *(^)(T))fmap;
+
+/**
  Cancels the receiver if it doesn't resolve within the timeout.
 
  @param timeout the amount of time to time out the receiver in
@@ -240,6 +261,14 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
  @return a future with the replacement.
  */
 - (FBFuture<T> *)rephraseFailure:(NSString *)format, ... NS_FORMAT_FUNCTION(1,2);
+
+/**
+ A helper to log completion of the future.
+
+ @param logger the logger to log to.
+ @param format a description of the future.
+ */
+- (FBFuture<T> *)logCompletion:(id<FBControlCoreLogger>)logger withPurpose:(NSString *)format, ... NS_FORMAT_FUNCTION(2,3);
 
 #pragma mark Properties
 
@@ -319,6 +348,8 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
  */
 @interface FBFutureContext <T : id> : NSObject
 
+#pragma mark Public Methods
+
 /**
  Return a Future from the context.
  The reciever's teardown will occur *after* the Future returned by `fmap` resolves.
@@ -356,6 +387,14 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
  @return a new Future Context.
  */
 + (FBFutureContext *)error:(NSError *)error;
+
+#pragma mark Properties
+
+/**
+ The future keeping the context alive.
+ The context will not be torn down until this future resolves.
+ */
+@property (nonatomic, strong, readonly) FBFuture<T> *future;
 
 @end
 

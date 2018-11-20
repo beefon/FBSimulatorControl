@@ -25,6 +25,7 @@ static NSString *const EventClassStringComposite = @"composite";
 static NSString *const EventClassStringTouch = @"touch";
 static NSString *const EventClassStringButton = @"button";
 static NSString *const EventClassStringKeyboard = @"keyboard";
+static NSString *const EventClassStringDelay = @"delay";
 
 @interface FBSimulatorHIDEvent ()
 
@@ -492,6 +493,81 @@ static NSString *const KeyKeycode = @"keycode";
 
 @end
 
+@interface FBSimulatorHIDEvent_Delay : FBSimulatorHIDEvent
+
+@property (nonatomic, assign, readonly) double duration;
+
+@end
+
+@implementation FBSimulatorHIDEvent_Delay
+
+static NSString *const KeyDuration = @"duration";
+
+- (instancetype)initWithDuration:(double)duration
+{
+  self = [super init];
+  if (!self) {
+    return nil;
+  }
+  _duration = duration;
+  return self;
+}
+
++ (instancetype)inflateFromJSON:(id)json error:(NSError **)error
+{
+  if (![FBCollectionInformation isDictionaryHeterogeneous:json keyClass:NSString.class valueClass:NSObject.class]) {
+    return [[FBSimulatorError
+             describe:@"Expected an input of Dictionary<String, Object>"]
+            fail:error];
+  }
+  NSString *class = json[KeyEventClass];
+  if (![class isEqualToString:EventClassStringDelay]) {
+    return [[FBSimulatorError
+             describeFormat:@"Expected %@ to be %@", class, EventClassStringDelay]
+            fail:error];
+  }
+  NSNumber *duration = json[KeyDuration];
+  if (![duration isKindOfClass:NSNumber.class]) {
+    return [[FBSimulatorError
+             describeFormat:@"Expected %@ for %@ to be a Number", duration, KeyDuration]
+            fail:error];
+  }
+  return [[self alloc] initWithDuration:duration.doubleValue];
+}
+
+- (id)jsonSerializableRepresentation
+{
+  return @{
+           KeyDuration: @(self.duration),
+           KeyEventClass: EventClassStringDelay,
+           };
+}
+
+- (FBFuture<NSNull *> *)performOnHID:(FBSimulatorHID *)hid
+{
+  return [FBFuture futureWithDelay:self.duration future:[FBFuture futureWithResult:NSNull.null]];
+}
+
+- (NSString *)description
+{
+  return [NSString stringWithFormat:@"Delay for %lu", (unsigned long)self.duration];
+}
+
+- (BOOL)isEqual:(FBSimulatorHIDEvent_Delay *)event
+{
+  if (![event isKindOfClass:self.class]) {
+    return NO;
+  }
+  return self.duration == event.duration;
+}
+
+- (NSUInteger)hash
+{
+  return (NSUInteger)self.duration;
+}
+
+@end
+
 @implementation FBSimulatorHIDEvent
 
 #pragma mark Initializers
@@ -585,6 +661,11 @@ static NSString *const KeyKeycode = @"keycode";
   return [self eventWithEvents:events];
 }
 
++ (instancetype)delay:(double)duration
+{
+  return [[FBSimulatorHIDEvent_Delay alloc] initWithDuration:duration];
+}
+
 #pragma mark JSON
 
 + (instancetype)inflateFromJSON:(id)json error:(NSError **)error
@@ -676,16 +757,14 @@ static NSString *const DirectionUp = @"up";
 
 - (FBFuture<id<FBiOSTargetContinuation>> *)runWithTarget:(id<FBiOSTarget>)target consumer:(id<FBFileConsumer>)consumer reporter:(id<FBEventReporter>)reporter
 {
-  if (![target isKindOfClass:FBSimulator.class]) {
+  id<FBSimulatorLifecycleCommands> commands = (id<FBSimulatorLifecycleCommands>) target;
+  if (![target conformsToProtocol:@protocol(FBSimulatorLifecycleCommands)]) {
     return [[FBSimulatorError
       describeFormat:@"%@ is not a Simulator", target]
       failFuture];
   }
-  FBSimulator *simulator = (FBSimulator *) target;
-  return [[[[FBFuture
-    onQueue:target.workQueue resolveValue:^ FBSimulatorConnection * (NSError **error) {
-      return [simulator connectWithError:error];
-    }]
+  return [[[[commands
+    connect]
     onQueue:target.workQueue fmap:^(FBSimulatorConnection *connection) {
       return [connection connectToHID];
     }]

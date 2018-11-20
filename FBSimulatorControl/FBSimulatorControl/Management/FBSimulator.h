@@ -20,6 +20,7 @@
 #import <FBSimulatorControl/FBSimulatorKeychainCommands.h>
 #import <FBSimulatorControl/FBSimulatorLaunchCtlCommands.h>
 #import <FBSimulatorControl/FBSimulatorLifecycleCommands.h>
+#import <FBSimulatorControl/FBSimulatorMediaCommands.h>
 #import <FBSimulatorControl/FBSimulatorSettingsCommands.h>
 #import <FBSimulatorControl/FBSimulatorVideoRecordingCommands.h>
 #import <FBSimulatorControl/FBSimulatorXCTestCommands.h>
@@ -28,6 +29,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol FBSimulatorEventSink;
 @protocol FBControlCoreLogger;
+
+@class FBAppleSimctlCommandExecutor;
 @class FBControlCoreLogger;
 @class FBProcessFetcher;
 @class FBProcessInfo;
@@ -40,7 +43,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Defines the High-Level Properties and Methods that exist on any Simulator returned from `FBSimulatorPool`.
  */
-@interface FBSimulator : NSObject <FBiOSTarget, FBCrashLogCommands, FBScreenshotCommands, FBSimulatorAgentCommands, FBSimulatorApplicationCommands, FBApplicationDataCommands, FBSimulatorBridgeCommands, FBSimulatorKeychainCommands, FBSimulatorSettingsCommands, FBSimulatorXCTestCommands, FBSimulatorLifecycleCommands, FBSimulatorLaunchCtlCommands>
+@interface FBSimulator : NSObject <FBiOSTarget, FBCrashLogCommands, FBScreenshotCommands, FBSimulatorAgentCommands, FBSimulatorApplicationCommands, FBApplicationDataCommands, FBSimulatorBridgeCommands, FBSimulatorKeychainCommands, FBSimulatorSettingsCommands, FBSimulatorXCTestCommands, FBSimulatorLifecycleCommands, FBSimulatorLaunchCtlCommands, FBSimulatorMediaCommands>
 
 /**
  The Underlying SimDevice.
@@ -108,6 +111,11 @@ NS_ASSUME_NONNULL_BEGIN
  The FBSimulatorDiagnostics instance for fetching diagnostics for the Simulator.
  */
 @property (nonatomic, strong, readonly, nonnull) FBSimulatorDiagnostics *simulatorDiagnostics;
+
+/*
+ A command executor for simctl
+ */
+@property (nonatomic, strong, readonly) FBAppleSimctlCommandExecutor *simctlExecutor;
 
 @end
 

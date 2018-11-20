@@ -151,7 +151,6 @@ static void final_resolveUntil(FBMutableFuture *final, dispatch_queue_t queue, F
 
 @interface FBFutureContext ()
 
-@property (nonatomic, strong, readonly) FBFuture *future;
 @property (nonatomic, copy, readonly) NSMutableArray<FBFutureContext_Teardown *> *teardowns;
 
 @end
@@ -472,6 +471,15 @@ static void final_resolveUntil(FBMutableFuture *final, dispatch_queue_t queue, F
   return self;
 }
 
+- (instancetype)onQueue:(dispatch_queue_t)queue doOnResolved:(void (^)(id))handler
+{
+  return [self onQueue:queue map:^(id result) {
+    handler(result);
+    return result;
+  }];
+}
+
+
 - (instancetype)onQueue:(dispatch_queue_t)queue respondToCancellation:(FBFuture<NSNull *> *(^)(void))handler
 {
   NSParameterAssert(queue);
@@ -573,6 +581,19 @@ static void final_resolveUntil(FBMutableFuture *final, dispatch_queue_t queue, F
   return [[FBFutureContext alloc] initWithFuture:self teardowns:@[teardown].mutableCopy];
 }
 
+- (FBFutureContext *)onQueue:(dispatch_queue_t)queue pushTeardown:(FBFutureContext *(^)(id))fmap
+{
+  NSMutableArray<FBFutureContext_Teardown *> *teardowns = NSMutableArray.array;
+  FBFuture *future = [self onQueue:queue fmap:^(id value) {
+    FBFutureContext *chained = fmap(value);
+    for (FBFutureContext_Teardown *teardown in chained.teardowns) {
+      [teardowns addObject:[[FBFutureContext_Teardown alloc] initWithFuture:chained.future queue:teardown.queue action:teardown.action]];
+    }
+    return chained.future;
+  }];
+  return [[FBFutureContext alloc] initWithFuture:future teardowns:teardowns];
+}
+
 - (FBFuture *)mapReplace:(id)replacement
 {
   return [self onQueue:FBFuture.internalQueue map:^(id _) {
@@ -615,6 +636,18 @@ static void final_resolveUntil(FBMutableFuture *final, dispatch_queue_t queue, F
       describe:string]
       causedBy:error]
       failFuture];
+  }];
+}
+
+- (FBFuture *)logCompletion:(id<FBControlCoreLogger>)logger withPurpose:(NSString *)format, ...
+{
+  va_list args;
+  va_start(args, format);
+  NSString *string = [[NSString alloc] initWithFormat:format arguments:args];
+  va_end(args);
+
+  return [self onQueue:FBFuture.internalQueue notifyOfCompletion:^(FBFuture *resolved) {
+    [logger logFormat:@"Complted %@ with state '%@'", string, resolved];
   }];
 }
 

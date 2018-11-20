@@ -17,13 +17,13 @@
 #import "FBSimulatorSet.h"
 #import "FBFramebuffer.h"
 #import "FBSimulatorVideo.h"
-#import "FBFramebufferSurface.h"
 #import "FBSimulatorBitmapStream.h"
+#import "FBVideoEncoderConfiguration.h"
 
 @interface FBSimulatorVideoRecordingCommands ()
 
 @property (nonatomic, weak, readonly) FBSimulator *simulator;
-@property (nonatomic, strong, nullable, readwrite) FBSimulatorVideo *recorder;
+@property (nonatomic, strong, nullable, readwrite) FBSimulatorVideo *video;
 
 @end
 
@@ -48,20 +48,12 @@
 
 #pragma mark FBVideoRecordingCommands Implementation
 
-- (FBFuture<id<FBVideoRecordingSession>> *)startRecordingToFile:(NSString *)filePath
+- (FBFuture<id<FBiOSTargetContinuation>> *)startRecordingToFile:(NSString *)filePath
 {
-  return [[FBFuture
-    onQueue:self.simulator.workQueue resolve:^ FBFuture<FBSimulatorVideo *> * {
-      if (self.recorder) {
-        return [[FBSimulatorError
-          describeFormat:@"Cannot start recording, there is already a recorder %@", self.recorder]
-          failFuture];
-      }
-      return [self obtainVideoRecorder];
-    }]
-    onQueue:self.simulator.workQueue fmap:^(FBSimulatorVideo *recorder) {
-      self.recorder = recorder;
-      return [[recorder startRecordingToFile:filePath] mapReplace:recorder];
+  return [[self
+    obtainVideo]
+    onQueue:self.simulator.workQueue fmap:^(FBSimulatorVideo *video) {
+      return [[video startRecordingToFile:filePath] mapReplace:video];
     }];
 }
 
@@ -69,15 +61,15 @@
 {
   return [[FBFuture
     onQueue:self.simulator.workQueue resolve:^ FBFuture<NSNull *> * {
-       if (!self.recorder) {
+       if (!self.video) {
          return [[FBSimulatorError
-          describeFormat:@"Cannot start recording, there is not an active recorder %@", self.recorder]
+          describe:@"Cannot start recording, there is not an active recorder"]
           failFuture];
        }
-       return [self.recorder stopRecording];
+       return [self.video stopRecording];
     }]
     onQueue:self.simulator.workQueue notifyOfCompletion:^(id _){
-      self.recorder = nil;
+      self.video = nil;
     }];
 }
 
@@ -91,55 +83,35 @@
       failFuture];
   }
   id<FBControlCoreLogger> logger = self.simulator.logger;
-  return [[self
-    obtainSurface]
-    onQueue:self.simulator.workQueue map:^(FBFramebufferSurface *surface) {
+  return [[self.simulator
+    connectToFramebuffer]
+    onQueue:self.simulator.workQueue map:^(FBFramebuffer *framebuffer) {
       NSNumber *framesPerSecond = configuration.framesPerSecond;
       if (framesPerSecond) {
-        return [FBSimulatorBitmapStream eagerStreamWithSurface:surface framesPerSecond:framesPerSecond.unsignedIntegerValue logger:logger];
+        return [FBSimulatorBitmapStream eagerStreamWithFramebuffer:framebuffer framesPerSecond:framesPerSecond.unsignedIntegerValue logger:logger];
       }
-      return [FBSimulatorBitmapStream lazyStreamWithSurface:surface logger:logger];
+      return [FBSimulatorBitmapStream lazyStreamWithFramebuffer:framebuffer logger:logger];
     }];
 }
 
 #pragma mark Private
 
-- (FBFuture<FBSimulatorVideo *> *)obtainVideoRecorder
+- (FBFuture<FBSimulatorVideo *> *)obtainVideo
 {
+  if (self.video) {
+    return [FBFuture futureWithResult:self.video];
+  }
   if (FBSimulatorVideoRecordingCommands.shouldUseSimctlEncoder) {
-    FBSimulatorVideo *recorder = [FBSimulatorVideo
-      simctlVideoForDeviceSetPath:self.simulator.set.deviceSet.setPath
-      deviceUUID:self.simulator.device.UDID.UUIDString
-      logger:self.simulator.logger];
-    return [FBFuture futureWithResult:recorder];
+    self.video = [FBSimulatorVideo videoWithSimctlExecutor:self.simulator.simctlExecutor logger:self.simulator.logger];
+    return [FBFuture futureWithResult:self.video];
   }
 
-  return [[self.simulator
-    connectToFramebuffer]
-    onQueue:self.simulator.workQueue fmap:^(FBFramebuffer *framebuffer) {
-      FBSimulatorVideo *video = framebuffer.video;
-      if (!video) {
-        return [[[FBSimulatorError
-          describe:@"Simulator Does not have a FBSimulatorVideo instance"]
-          inSimulator:self.simulator]
-          failFuture];
-      }
-      return [FBFuture futureWithResult:video];
-    }];
-}
 
-- (FBFuture<FBFramebufferSurface *> *)obtainSurface
-{
   return [[self.simulator
     connectToFramebuffer]
-    onQueue:self.simulator.workQueue fmap:^(FBFramebuffer *framebuffer) {
-      FBFramebufferSurface *surface = framebuffer.surface;
-      if (!surface) {
-        return [[FBSimulatorError
-          describe:@"Framebuffer does not have a surface"]
-          failFuture];
-      }
-      return [FBFuture futureWithResult:surface];
+    onQueue:self.simulator.workQueue map:^(FBFramebuffer *framebuffer) {
+      self.video = [FBSimulatorVideo videoWithConfiguration:FBVideoEncoderConfiguration.defaultConfiguration framebuffer:framebuffer logger:self.simulator.logger];
+      return self.video;
     }];
 }
 

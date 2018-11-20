@@ -133,8 +133,9 @@ struct SimulatorActionRunner: Runner {
       return SimpleRunner(reporter, .open, FBEventReporterSubject(string: url.bridgedAbsoluteString)) {
         try simulator.open(url)
       }
-    case .relaunch(let appLaunch):
-      return FutureRunner(reporter, .relaunch, appLaunch.subject, simulator.launchOrRelaunchApplication(appLaunch))
+    case .relaunch(var appLaunch):
+      appLaunch = FBApplicationLaunchConfiguration.init(bundleID: appLaunch.bundleID, bundleName: appLaunch.bundleName, arguments: appLaunch.arguments, environment: appLaunch.environment, output: appLaunch.output, launchMode: .relaunchIfRunning)
+      return FutureRunner(reporter, .relaunch, appLaunch.subject, simulator.launchApplication(appLaunch))
     case .setLocation(let latitude, let longitude):
       return FutureRunner(
         reporter,
@@ -181,10 +182,8 @@ private struct UploadRunner: Runner {
     }
 
     if media.count > 0 {
-      let paths = media.map { $0.1 }
-      let runner = SimpleRunner(reporter, .upload, FBEventReporterSubject(strings: paths)) {
-        try FBUploadMediaStrategy(simulator: self.reporter.simulator).uploadMedia(paths)
-      }
+      let paths = media.map { NSURL.fileURL(withPath: $0.1) }
+      let runner = FutureRunner(self.reporter, .upload, self.reporter.simulator.subject, self.reporter.simulator.addMedia(paths))
       let result = runner.run()
       switch result.outcome {
       case .failure: return result

@@ -91,11 +91,12 @@
                                                                           error:NULL];
   }
   FBApplicationLaunchConfiguration *appLaunch = [FBApplicationLaunchConfiguration
-    configurationWithApplication:testRunnerApp
+    configurationWithBundleID:testRunnerApp.bundleID
+    bundleName:testRunnerApp.bundleID
     arguments:@[]
     environment:self.configuration.processUnderTestEnvironment
-    waitForDebugger:NO
-    output:outputConfiguration];
+    output:outputConfiguration
+    launchMode:FBApplicationLaunchModeFailIfRunning];
 
   FBTestLaunchConfiguration *testLaunchConfiguration = [[FBTestLaunchConfiguration
     configurationWithTestBundlePath:self.configuration.testBundlePath]

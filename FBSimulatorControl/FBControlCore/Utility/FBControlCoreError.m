@@ -29,6 +29,8 @@ NSString *const FBControlCoreErrorDomain = @"com.facebook.FBControlCore";
 
 @implementation FBControlCoreError
 
+#pragma mark Initializers
+
 - (instancetype)init
 {
   self = [super init];
@@ -45,10 +47,7 @@ NSString *const FBControlCoreErrorDomain = @"com.facebook.FBControlCore";
   return self;
 }
 
-- (NSString *)description
-{
-  return [NSString stringWithFormat:@"<%@: %p underlying error: %@>", NSStringFromClass(self.class), (void *)self, [self build]];
-}
+#pragma mark Public Methods
 
 + (instancetype)describe:(NSString *)description
 {
@@ -209,6 +208,13 @@ NSString *const FBControlCoreErrorDomain = @"com.facebook.FBControlCore";
   }
 
   return error;
+}
+
+#pragma mark NSObject
+
+- (NSString *)description
+{
+  return [self.build description];
 }
 
 #pragma mark Private

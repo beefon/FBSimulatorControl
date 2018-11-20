@@ -122,6 +122,28 @@
   [self waitForExpectations:@[expectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
 }
 
+- (void)testDoActionCallback
+{
+  XCTestExpectation *actionExpectation = [[XCTestExpectation alloc] initWithDescription:@"Action Callback called"];
+  XCTestExpectation *completionExpectation = [[XCTestExpectation alloc] initWithDescription:@"Completion called"];
+  __block BOOL actionCalled = NO;
+
+  [[[FBFuture
+    futureWithResult:@YES]
+    onQueue:self.queue doOnResolved:^(NSNumber *value) {
+      XCTAssertEqual(value, @YES);
+      actionCalled = YES;
+      [actionExpectation fulfill];
+    }]
+    onQueue:self.queue notifyOfCompletion:^(FBFuture<NSNumber *> *future) {
+      XCTAssertEqual(future.result, @YES);
+      XCTAssertTrue(actionCalled);
+      [completionExpectation fulfill];
+    }];
+
+  [self waitForExpectations:@[actionExpectation, completionExpectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
+}
+
 - (void)testCompositeSuccess
 {
   XCTestExpectation *expectation = [[XCTestExpectation alloc] initWithDescription:@"Composite Callback is called"];
@@ -878,6 +900,33 @@
     }];
 
   [self waitForExpectations:@[completionExpectation, outerTeardownExpectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
+}
+
+- (void)testFutureToContext
+{
+  __block BOOL teardownCalled = NO;
+  XCTestExpectation *innerTeardownExpectation = [[XCTestExpectation alloc] initWithDescription:@"Resolved Inner Teardown"];
+
+  [[[FBFuture
+    futureWithResult:@1]
+    onQueue:self.queue pushTeardown:^(id value) {
+      XCTAssertEqualObjects(value, @1);
+      return [[FBFuture
+        futureWithResult:@2]
+        onQueue:self.queue contextualTeardown:^(id innerValue) {
+          XCTAssertFalse(teardownCalled);
+          XCTAssertEqualObjects(innerValue, @2);
+          [innerTeardownExpectation fulfill];
+          teardownCalled = YES;
+        }];
+    }]
+    onQueue:self.queue fmap:^(id value) {
+      XCTAssertEqualObjects(value, @2);
+      XCTAssertFalse(teardownCalled);
+      return [FBFuture futureWithResult:@3];
+    }];
+
+  [self waitForExpectations:@[innerTeardownExpectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
 }
 
 #pragma mark - Helpers
