@@ -18,6 +18,7 @@
 #if defined(__apple_build_version__)
 
 #import <CoreServices/CoreServices.h>
+#include <sys/stat.h>
 
 @interface FBCrashLogNotifier_FSEvents : NSObject
 
@@ -29,6 +30,25 @@
 
 @end
 
+typedef NS_ENUM(NSUInteger, FBCrashLogNotifierFileEvent) {
+  FBCrashLogNotifierFileEventUnknown = 0,
+  FBCrashLogNotifierFileEventAdded = 1,
+  FBCrashLogNotifierFileEventRemoved = 2,
+};
+
+static FBCrashLogNotifierFileEvent GetEventType(FSEventStreamEventFlags flag, NSString *filePath) {
+  if (flag & kFSEventStreamEventFlagItemRemoved) {
+    return FBCrashLogNotifierFileEventRemoved;
+  } else if (flag & kFSEventStreamEventFlagItemCreated) {
+    return FBCrashLogNotifierFileEventAdded;
+  } else if (flag & kFSEventStreamEventFlagItemRenamed) {
+    struct stat buffer;
+    int value = stat(filePath.UTF8String, &buffer);
+    return value == 0 ? FBCrashLogNotifierFileEventAdded : FBCrashLogNotifierFileEventRemoved;
+  }
+  return FBCrashLogNotifierFileEventUnknown;
+}
+
 static void EventStreamCallback(
   ConstFSEventStreamRef streamRef,
   FBCrashLogNotifier_FSEvents *notifier,
@@ -39,7 +59,17 @@ static void EventStreamCallback(
 ){
   for (size_t index = 0; index < numEvents; index++) {
     NSString *path = eventPaths[index];
-    [notifier.store ingestCrashLogAtPath:path];
+    FSEventStreamEventFlags flag = eventFlags[index];
+    switch (GetEventType(flag, path)) {
+      case FBCrashLogNotifierFileEventAdded:
+        [notifier.store ingestCrashLogAtPath:path];
+        continue;
+      case FBCrashLogNotifierFileEventRemoved:
+        [notifier.store removeCrashLogAtPath:path];
+        continue;
+      default:
+        continue;
+    }
   }
 }
 
@@ -60,7 +90,7 @@ static void EventStreamCallback(
   return self;
 }
 
-- (void)startListening
+- (void)startListening:(BOOL)onlyNew
 {
   if (self.eventStream) {
     return;
@@ -86,9 +116,9 @@ static void EventStreamCallback(
     (FSEventStreamCallback) EventStreamCallback, // Callback
     &context,  // Context
     CFBridgingRetain(pathsToWatch), // Paths to watch
-    kFSEventStreamEventIdSinceNow,  // Since When
+    onlyNew ? kFSEventStreamEventIdSinceNow : 0,  // Since When
     0,  // Latency
-    kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents
+    kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer
   );
   FSEventStreamSetDispatchQueue(eventStream, self.queue);
   Boolean started = FSEventStreamStart(eventStream);
@@ -144,10 +174,10 @@ static void EventStreamCallback(
 
 #pragma mark Public Methods
 
-- (instancetype)startListening
+- (instancetype)startListening:(BOOL)onlyNew
 {
 #if defined(__apple_build_version__)
-  [self.fsEvents startListening];
+  [self.fsEvents startListening:onlyNew];
 #else
   self.sinceDate = NSDate.date;
 #endif
@@ -156,7 +186,7 @@ static void EventStreamCallback(
 
 - (FBFuture<FBCrashLogInfo *> *)nextCrashLogForPredicate:(NSPredicate *)predicate
 {
-  [self startListening];
+  [self startListening:YES];
 
 #if defined(__apple_build_version__)
   return [FBCrashLogNotifier.sharedInstance.fsEvents.store nextCrashLogForMatchingPredicate:predicate];
