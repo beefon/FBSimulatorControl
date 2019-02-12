@@ -12,19 +12,18 @@
 #import <FBControlCore/FBControlCore.h>
 #import <XCTestBootstrap/XCTestBootstrap.h>
 
-@class DVTiOSDevice;
+NS_ASSUME_NONNULL_BEGIN
+
 @class FBDeviceSet;
 @class FBProductBundle;
 @class FBTestRunnerConfiguration;
 @protocol FBDeviceOperator;
 @protocol FBControlCoreLogger;
 
-NS_ASSUME_NONNULL_BEGIN
-
 /**
- Class that wraps DVTAbstractiOSDevice and it's device operator that can perform actions on it.
+ A class that represents an iOS Device.
  */
-@interface FBDevice : NSObject <FBiOSTarget>
+@interface FBDevice : NSObject <FBiOSTarget, FBDebuggerCommands>
 
 /**
  The Device Set to which the Device Belongs.
@@ -42,19 +41,27 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly) NSString *modelName;
 
 /**
- Device's system Version
+ Device's 'Product Version'
  */
-@property (nonatomic, copy, readonly) NSString *systemVersion;
+@property (nonatomic, copy, readonly) NSString *productVersion;
 
 /**
- Add a forwarding class. The class has to conform to the FBiOSTargetCommand
- protocol. The class is added globally for all all devices and needs to
- be added before FBDevice instances are created.
-
- @param class Command class to be added.
- @returns if it succeeded
+ Device's 'Product Version'
  */
-+ (BOOL)addForwardingCommandClass:(Class)class error:(NSError **)error;
+@property (nonatomic, copy, readonly) NSString *buildVersion;
+
+/**
+ Interpolated NSOperatingSystemVersion.
+ */
+@property (nonatomic, assign, readonly) NSOperatingSystemVersion operatingSystemVersion;
+
+/**
+ Constructs an Operating System Version from a string.
+
+ @param string the string to interpolate.
+ @return an NSOperatingSystemVersion for the string.
+ */
++ (NSOperatingSystemVersion)operatingSystemVersionFromString:(NSString *)string;
 
 @end
 

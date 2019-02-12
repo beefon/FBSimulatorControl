@@ -13,34 +13,51 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@protocol FBControlCoreLogger;
-
 /**
- A Consumer of a File's Data.
+ A consumer of NSData.
  */
-@protocol FBFileConsumer <NSObject>
+@protocol FBDataConsumer <NSObject>
 
 /**
- Consumes the provided text data.
+ Consumes the provided binary data.
 
  @param data the data to consume.
  */
 - (void)consumeData:(NSData *)data;
 
 /**
- Consumes an EOF.
+ Consumes an end-of-file.
  */
 - (void)consumeEndOfFile;
 
 @end
 
 /**
- A specialization of a FBFileConsumer that can expose lifecycle with a Future.
+ A consumer of dispatch_data.
  */
-@protocol FBFileConsumerLifecycle <FBFileConsumer>
+@protocol FBDispatchDataConsumer <NSObject>
 
 /**
- A Future that resolves when an EOF has been recieved.
+ Consumes the provided binary data.
+
+ @param data the data to consume.
+ */
+- (void)consumeData:(dispatch_data_t)data;
+
+/**
+ Consumes an end-of-file.
+ */
+- (void)consumeEndOfFile;
+
+@end
+
+/**
+ Allows observation of a data consumer to observe.
+ */
+@protocol FBDataConsumerLifecycle <NSObject>
+
+/**
+ A Future that resolves when an end-of-file has been recieved.
  This is helpful for ensuring that all consumer lines have been drained.
  */
 @property (nonatomic, strong, readonly) FBFuture<NSNull *> *eofHasBeenReceived;
@@ -48,9 +65,9 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 /**
- The Non-mutating methods of a line reader.
+ The non-mutating methods of a buffer.
  */
-@protocol FBAccumulatingLineBuffer <FBFileConsumerLifecycle>
+@protocol FBAccumulatingBuffer <FBDataConsumer, FBDataConsumerLifecycle>
 
 /**
  Obtains a copy of the current output data.
@@ -65,33 +82,89 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 /**
- The Mutating Methods of a line reader.
+ The mutating methods of a buffer.
  */
-@protocol FBConsumableLineBuffer <FBFileConsumerLifecycle, FBAccumulatingLineBuffer>
+@protocol FBConsumableBuffer <FBAccumulatingBuffer>
 
 /**
  Consume the remainder of the buffer available, returning it as Data.
  This will flush the entirity of the buffer.
+
+ @return all the current data in the buffer.
  */
 - (nullable NSData *)consumeCurrentData;
 
 /**
  Consume the remainder of the buffer available, returning it as a String.
  This will flush the entirity of the buffer.
+
+ @return all the current data in the buffer as a string.
  */
 - (nullable NSString *)consumeCurrentString;
 
 /**
+ Consumes until data recieved.
+
+ @param terminal the terminal.
+ @return all the data before the separator if there is data to consume, nil otherwise.
+ */
+- (nullable NSData *)consumeUntil:(NSData *)terminal;
+
+/**
  Consume a line if one is available, returning it as Data.
  This will flush the buffer of the lines that are consumed.
+
+ @return all the data before a newline if there is data to consume, nil otherwise.
  */
 - (nullable NSData *)consumeLineData;
 
 /**
  Consume a line if one is available, returning it as a String.
  This will flush the buffer of the lines that are consumed.
+
+ @return all the data before a newline as a string if there is data to consume, nil otherwise.
  */
 - (nullable NSString *)consumeLineString;
+
+/**
+ Notifies when there has been consumption to a terminal
+
+ @param terminal the terminal.
+ @return a future wrapping the read data.
+ */
+- (FBFuture<NSData *> *)consumeAndNotifyWhen:(NSData *)terminal;
+
+@end
+
+/**
+ Adapts a NSData consumer to a dispatch_data consumer to.
+ */
+@interface FBDataConsumerAdaptor : NSObject
+
+/**
+ Adapts a NSData consumer to a dispatch_data consumer.
+
+ @param consumer the consumer to adapt.
+ @return a dispatch_data consumer.
+ */
++ (id<FBDispatchDataConsumer>)dispatchDataConsumerForDataConsumer:(id<FBDataConsumer>)consumer;
+
+/**
+ Adapts a NSData consumer to a dispatch_data consumer.
+
+ @param consumer the consumer to adapt.
+ @return a NSData consumer.
+ */
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)dataConsumerForDispatchDataConsumer:(id<FBDispatchDataConsumer, FBDataConsumerLifecycle>)consumer;
+
+/**
+ Converts dispatch_data to NSData.
+ Note that this will copy data if the underlying dispatch data is non-contiguous.
+
+ @param dispatchData the data to adapt.
+ @return NSData from the dispatchData.
+ */
++ (NSData *)adaptDispatchData:(dispatch_data_t)dispatchData;
 
 @end
 
@@ -107,28 +180,28 @@ NS_ASSUME_NONNULL_BEGIN
 
  @return a FBLineBuffer implementation.
  */
-+ (id<FBAccumulatingLineBuffer>)accumulatingBuffer;
++ (id<FBAccumulatingBuffer>)accumulatingBuffer;
 
 /**
  A line buffer that is only mutated through consuming data.
 
  @return a FBLineBuffer implementation.
  */
-+ (id<FBAccumulatingLineBuffer>)accumulatingBufferForMutableData:(NSMutableData *)data;
++ (id<FBAccumulatingBuffer>)accumulatingBufferForMutableData:(NSMutableData *)data;
 
 /**
  A line buffer that is appended to by consuming data and can be drained.
 
- @return a FBConsumableLineBuffer implementation.
+ @return a FBConsumableBuffer implementation.
  */
-+ (id<FBConsumableLineBuffer>)consumableBuffer;
++ (id<FBConsumableBuffer>)consumableBuffer;
 
 @end
 
 /**
  A Reader of Text Data, calling the callback when a full line is available.
  */
-@interface FBLineFileConsumer : NSObject <FBFileConsumer, FBFileConsumerLifecycle>
+@interface FBLineDataConsumer : NSObject <FBDataConsumer, FBDataConsumerLifecycle>
 
 /**
  Creates a Consumer of lines from a block.
@@ -170,10 +243,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+@protocol FBControlCoreLogger;
+
 /**
  A consumer that does nothing with the data.
  */
-@interface FBLoggingFileConsumer : NSObject <FBFileConsumer>
+@interface FBLoggingDataConsumer : NSObject <FBDataConsumer>
 
 /**
  The Designated Initializer
@@ -190,7 +265,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  A Composite Consumer.
  */
-@interface FBCompositeFileConsumer : NSObject <FBFileConsumer, FBFileConsumerLifecycle>
+@interface FBCompositeDataConsumer : NSObject <FBDataConsumer, FBDataConsumerLifecycle>
 
 /**
  A Consumer of Consumers.
@@ -198,14 +273,14 @@ NS_ASSUME_NONNULL_BEGIN
  @param consumers the consumers to compose.
  @return a new consumer.
  */
-+ (instancetype)consumerWithConsumers:(NSArray<id<FBFileConsumer>> *)consumers;
++ (instancetype)consumerWithConsumers:(NSArray<id<FBDataConsumer>> *)consumers;
 
 @end
 
 /**
  A consumer that does nothing with the data.
  */
-@interface FBNullFileConsumer : NSObject <FBFileConsumer>
+@interface FBNullDataConsumer : NSObject <FBDataConsumer>
 
 @end
 

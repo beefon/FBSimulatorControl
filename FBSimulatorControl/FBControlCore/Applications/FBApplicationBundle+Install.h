@@ -17,11 +17,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol FBControlCoreLogger;
 
+/**
+ Enumerations for possible header magic numbers in files & data.
+ */
 typedef enum {
-  FBDataTypeTAR,
-  FBDataTypeIPA,
-  FBDataTypeUknown,
-} FBDataType;
+  FBFileHeaderMagicUnknown = 0,
+  FBFileHeaderMagicTAR = 1,
+  FBFileHeaderMagicIPA = 2,
+} FBFileHeaderMagic;
 
 /**
  A value for an extracted application.
@@ -48,14 +51,15 @@ typedef enum {
 #pragma mark Public Methods
 
 /**
- Finds or Extracts an Application if it is determined to be an IPA.
+ Obtains an extracted version of an Application based on a file path.
+ When the context is torn down, any extracted path will be deleted.
 
  @param queue the queue to extract on.
  @param path the path of the .app or .ipa
  @param logger the (optional) logger to log to.
  @return a future wrapping the extracted application.
  */
-+ (FBFuture<FBExtractedApplication *> *)onQueue:(dispatch_queue_t)queue findOrExtractApplicationAtPath:(NSString *)path logger:(nullable id<FBControlCoreLogger>)logger;
++ (FBFutureContext<FBExtractedApplication *> *)onQueue:(dispatch_queue_t)queue findOrExtractApplicationAtPath:(NSString *)path logger:(nullable id<FBControlCoreLogger>)logger;
 
 /**
  Copy additional framework to Application path.
@@ -78,9 +82,9 @@ typedef enum {
  Check if given NSData is an ipa or a tar
 
  @param data the data to check.
- @return data type
+ @return the header magic if one could be deduced.
  */
-+ (FBDataType)getDataType:(NSData *)data;
++ (FBFileHeaderMagic)headerMagicForData:(NSData *)data;
 
 @end
 

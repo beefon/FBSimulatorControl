@@ -52,7 +52,7 @@
 {
   return [[[FBApplicationBundle
     onQueue:self.simulator.asyncQueue findOrExtractApplicationAtPath:path logger:self.simulator.logger]
-    onQueue:self.simulator.workQueue fmap:^FBFuture *(FBExtractedApplication *extractedApplication) {
+    onQueue:self.simulator.workQueue pop:^(FBExtractedApplication *extractedApplication) {
       return [[self installExtractedApplicationWithPath:extractedApplication.bundle.path] mapReplace:extractedApplication];
     }]
     onQueue:self.simulator.asyncQueue notifyOfCompletion:^(FBFuture<FBExtractedApplication *> *future) {
@@ -258,7 +258,7 @@ static NSString *const KeyDataContainer = @"DataContainer";
 
   return [FBInstalledApplication
     installedApplicationWithBundle:bundle
-    installType:[FBInstalledApplication installTypeFromString:typeString]
+    installType:[FBInstalledApplication installTypeFromString:typeString signerIdentity:nil]
     dataContainer:dataContainer.path];
 }
 

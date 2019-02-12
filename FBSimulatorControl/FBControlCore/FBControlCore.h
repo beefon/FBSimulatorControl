@@ -36,7 +36,9 @@
 #import <FBControlCore/FBCrashLogInfo.h>
 #import <FBControlCore/FBCrashLogNotifier.h>
 #import <FBControlCore/FBCrashLogStore.h>
+#import <FBControlCore/FBDataConsumer.h>
 #import <FBControlCore/FBDebugDescribeable.h>
+#import <FBControlCore/FBDebuggerCommands.h>
 #import <FBControlCore/FBDiagnostic.h>
 #import <FBControlCore/FBDiagnosticQuery.h>
 #import <FBControlCore/FBDispatchSourceNotifier.h>
@@ -44,7 +46,6 @@
 #import <FBControlCore/FBEventInterpreter.h>
 #import <FBControlCore/FBEventReporter.h>
 #import <FBControlCore/FBEventReporterSubject.h>
-#import <FBControlCore/FBFileConsumer.h>
 #import <FBControlCore/FBFileFinder.h>
 #import <FBControlCore/FBFileManager.h>
 #import <FBControlCore/FBFileReader.h>
@@ -83,9 +84,8 @@
 #import <FBControlCore/FBScreenshotCommands.h>
 #import <FBControlCore/FBServiceManagement.h>
 #import <FBControlCore/FBSettingsApproval.h>
-#import <FBControlCore/FBSocketReader.h>
+#import <FBControlCore/FBSocketConnectionManager.h>
 #import <FBControlCore/FBSocketServer.h>
-#import <FBControlCore/FBSocketWriter.h>
 #import <FBControlCore/FBSubstringUtilities.h>
 #import <FBControlCore/FBiOSTargetSet.h>
 #import <FBControlCore/FBiOSTargetStateUpdate.h>

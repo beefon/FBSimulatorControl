@@ -11,7 +11,7 @@ import FBSimulatorControl
 import Foundation
 
 extension FileOutput {
-  func makeWriter() throws -> FBFileWriter {
+  func makeWriter() throws -> FBDataConsumer {
     switch self {
     case .path(let path):
       return try FBFileWriter.syncWriter(forFilePath: path)
@@ -133,8 +133,11 @@ struct SimulatorActionRunner: Runner {
       return SimpleRunner(reporter, .open, FBEventReporterSubject(string: url.bridgedAbsoluteString)) {
         try simulator.open(url)
       }
-    case .relaunch(var appLaunch):
-      appLaunch = FBApplicationLaunchConfiguration.init(bundleID: appLaunch.bundleID, bundleName: appLaunch.bundleName, arguments: appLaunch.arguments, environment: appLaunch.environment, output: appLaunch.output, launchMode: .relaunchIfRunning)
+    case .relaunch(let processLaunch):
+      var appLaunch = FBApplicationLaunchConfiguration(bundleID: processLaunch.bundleID, bundleName: processLaunch.bundleName, arguments: processLaunch.arguments, environment: processLaunch.environment, output: processLaunch.output, launchMode: .relaunchIfRunning)
+      if processLaunch.waitForDebugger {
+        appLaunch = appLaunch.withWaitForDebugger(nil)
+      }
       return FutureRunner(reporter, .relaunch, appLaunch.subject, simulator.launchApplication(appLaunch))
     case .setLocation(let latitude, let longitude):
       return FutureRunner(
@@ -183,7 +186,7 @@ private struct UploadRunner: Runner {
 
     if media.count > 0 {
       let paths = media.map { NSURL.fileURL(withPath: $0.1) }
-      let runner = FutureRunner(self.reporter, .upload, self.reporter.simulator.subject, self.reporter.simulator.addMedia(paths))
+      let runner = FutureRunner(reporter, .upload, reporter.simulator.subject, reporter.simulator.addMedia(paths))
       let result = runner.run()
       switch result.outcome {
       case .failure: return result

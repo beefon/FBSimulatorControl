@@ -57,6 +57,13 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (FBFuture<NSNull *> *)stopListening;
 
+/**
+ Starts the socket server, managed by a context manager
+
+ @return a FBFutureContext that will stop listening when the context is torn down.
+ */
+- (FBFutureContext<NSNull *> *)startListeningContext;
+
 @end
 
 /**
@@ -66,7 +73,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  Called when the socket server has a new client connected.
- The File Handle return will close on deallocation so it is up to consumers to retain it.
+ The File Handle return will close on deallocation so it is up to consumers to retain it if it needs to use it.
+ If you wish to reject the connection, close the file handle immediately.
 
  @param server the socket server.
  @param address the IP Address of the connected client.

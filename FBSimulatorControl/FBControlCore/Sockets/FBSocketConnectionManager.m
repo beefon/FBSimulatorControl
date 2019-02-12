@@ -7,7 +7,7 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
-#import "FBSocketReader.h"
+#import "FBSocketConnectionManager.h"
 
 #import <sys/socket.h>
 #import <netinet/in.h>
@@ -17,20 +17,20 @@
 #import "FBSocketServer.h"
 #import "FBControlCoreError.h"
 
-@interface FBSocketReader_Connection : NSObject <FBFileConsumer>
+@interface FBSocketConnectionManager_Connection : NSObject <FBDataConsumer>
 
 @property (nonatomic, strong, readonly) id<FBSocketConsumer> consumer;
 
 @property (nonatomic, strong, nullable, readonly) NSFileHandle *fileHandle;
 @property (nonatomic, strong, nullable, readonly) FBFileReader *reader;
-@property (nonatomic, strong, nullable, readonly) FBFileWriter *writer;
+@property (nonatomic, strong, nullable, readonly) id<FBDataConsumer> writer;
 
 @property (nonatomic, strong, nullable, readonly) dispatch_queue_t completionQueue;
 @property (nonatomic, strong, nullable, readonly) void (^completionHandler)(void);
 
 @end
 
-@implementation FBSocketReader_Connection
+@implementation FBSocketConnectionManager_Connection
 
 - (instancetype)initWithConsumer:(id<FBSocketConsumer>)consumer fileHandle:(NSFileHandle *)fileHandle completionQueue:(dispatch_queue_t)completionQueue completionHandler:(void(^)(void))completionHandler
 {
@@ -55,7 +55,7 @@
     [self teardown];
     return [FBFuture futureWithError:error];
   }
-  _reader = [FBFileReader readerWithFileHandle:self.fileHandle consumer:self];
+  _reader = [FBFileReader readerWithFileHandle:self.fileHandle consumer:self logger:nil];
   return [[_reader
     startReading]
     onQueue:dispatch_get_main_queue() chain:^(FBFuture<NSNull *> *future) {
@@ -74,7 +74,7 @@
   _completionQueue = nil;
 }
 
-#pragma mark FBFileConsumer Implementation
+#pragma mark FBDataConsumer Implementation
 
 - (void)consumeData:(NSData *)data
 {
@@ -92,26 +92,26 @@
 
 @end
 
-@interface FBSocketReader () <FBSocketServerDelegate>
+@interface FBSocketConnectionManager () <FBSocketServerDelegate>
 
 @property (nonatomic, strong, readonly) FBSocketServer *server;
-@property (nonatomic, strong, readonly) id<FBSocketReaderDelegate> delegate;
-@property (nonatomic, strong, readonly) NSMutableDictionary<NSNumber *, FBSocketReader_Connection *> *connections;
+@property (nonatomic, strong, readonly) id<FBSocketConnectionManagerDelegate> delegate;
+@property (nonatomic, strong, readonly) NSMutableDictionary<NSNumber *, FBSocketConnectionManager_Connection *> *connections;
 
 @end
 
-@implementation FBSocketReader
+@implementation FBSocketConnectionManager
 
 @synthesize queue = _queue;
 
 #pragma mark Initializers
 
-+ (instancetype)socketReaderOnPort:(in_port_t)port delegate:(id<FBSocketReaderDelegate>)delegate
++ (instancetype)socketReaderOnPort:(in_port_t)port delegate:(id<FBSocketConnectionManagerDelegate>)delegate
 {
   return [[self alloc] initWithPort:port delegate:delegate];
 }
 
-- (instancetype)initWithPort:(in_port_t)port delegate:(id<FBSocketReaderDelegate>)delegate
+- (instancetype)initWithPort:(in_port_t)port delegate:(id<FBSocketConnectionManagerDelegate>)delegate
 {
   self = [super init];
   if (!self) {
@@ -147,7 +147,7 @@
   __weak typeof(self) weakSelf = self;
 
   // Create the Connection
-  FBSocketReader_Connection *connection = [[FBSocketReader_Connection alloc] initWithConsumer:consumer fileHandle:fileHandle completionQueue:self.queue completionHandler:^{
+  FBSocketConnectionManager_Connection *connection = [[FBSocketConnectionManager_Connection alloc] initWithConsumer:consumer fileHandle:fileHandle completionQueue:self.queue completionHandler:^{
     [weakSelf.connections removeObjectForKey:@(fileHandle.fileDescriptor)];
   }];
   // Bail early if the connection could not be consumed

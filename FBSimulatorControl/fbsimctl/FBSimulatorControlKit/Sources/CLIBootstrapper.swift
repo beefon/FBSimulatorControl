@@ -60,7 +60,7 @@ struct PrintRunner: Runner {
   let writer: Writer
 
   func run() -> CommandResult {
-    switch self.action {
+    switch action {
     case .coreFuture(let action):
       let output = action.printable
       writer.write(output)
@@ -68,7 +68,7 @@ struct PrintRunner: Runner {
     default:
       break
     }
-    return .failure("Action \(self.action) not printable")
+    return .failure("Action \(action) not printable")
   }
 }
 
@@ -110,9 +110,9 @@ extension CLI {
   private func createWriter() -> Writer {
     switch self {
     case .show:
-      return FileHandleWriter.stdErrWriter
+      return FBFileWriter.stdErrWriter
     case .print:
-      return FileHandleWriter.stdOutWriter
+      return FBFileWriter.stdOutWriter
     case .run(let command):
       return command.createWriter()
     }
@@ -123,9 +123,9 @@ extension Command {
   func createWriter() -> Writer {
     for action in actions {
       if case .stream = action {
-        return FileHandleWriter.stdErrWriter
+        return FBFileWriter.stdErrWriter
       }
     }
-    return FileHandleWriter.stdOutWriter
+    return FBFileWriter.stdOutWriter
   }
 }

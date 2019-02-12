@@ -14,25 +14,24 @@
 @interface FBFileWriter ()
 
 @property (nonatomic, strong, nullable, readwrite) NSFileHandle *fileHandle;
+@property (nonatomic, strong, readwrite) FBMutableFuture<NSNull *> *eofHasBeenReceivedMutable;
 
 - (instancetype)initWithFileHandle:(NSFileHandle *)fileHandle;
 
 @end
 
-@interface FBFileWriter_Null : FBFileWriter
+@interface FBFileWriter_Null : FBFileWriter <FBDispatchDataConsumer, FBDataConsumerLifecycle>
 
 @end
 
-@interface FBFileWriter_Sync : FBFileWriter
+@interface FBFileWriter_Sync : FBFileWriter <FBDispatchDataConsumer, FBDataConsumerLifecycle>
 
 @end
 
-@interface FBFileWriter_Async : FBFileWriter
+@interface FBFileWriter_Async : FBFileWriter <FBDispatchDataConsumer, FBDataConsumerLifecycle>
 
 @property (nonatomic, strong, readonly) dispatch_queue_t writeQueue;
-
 @property (nonatomic, strong, readwrite) dispatch_io_t io;
-@property (nonatomic, assign, readwrite) int errorCode;
 
 - (instancetype)initWithFileHandle:(NSFileHandle *)fileHandle writeQueue:(dispatch_queue_t)writeQueue;
 
@@ -63,32 +62,42 @@
   return fileHandle;
 }
 
-+ (instancetype)nullWriter
++ (FBFuture<id<FBDataConsumer, FBDataConsumerLifecycle>> *)asyncDispatchDataWriterWithFileHandle:(NSFileHandle *)fileHandle
 {
-  return [[FBFileWriter_Null alloc] init];
+  NSError *error = nil;
+  FBFileWriter_Async *writer = [[FBFileWriter_Async alloc] initWithFileHandle:fileHandle writeQueue:self.createWorkQueue];
+  if (![writer startReadingWithError:&error]) {
+    return [FBFuture futureWithError:error];
+  }
+  return [FBFuture futureWithResult:writer];
 }
 
-+ (instancetype)syncWriterWithFileHandle:(NSFileHandle *)fileHandle
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)nullWriter
 {
-  return [[FBFileWriter_Sync alloc] initWithFileHandle:fileHandle];
+  return [FBDataConsumerAdaptor dataConsumerForDispatchDataConsumer:[[FBFileWriter_Null alloc] init]];
 }
 
-+ (instancetype)asyncWriterWithFileHandle:(NSFileHandle *)fileHandle queue:(dispatch_queue_t)queue error:(NSError **)error
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)syncWriterWithFileHandle:(NSFileHandle *)fileHandle
+{
+  return [FBDataConsumerAdaptor dataConsumerForDispatchDataConsumer:[[FBFileWriter_Sync alloc] initWithFileHandle:fileHandle]];
+}
+
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)asyncWriterWithFileHandle:(NSFileHandle *)fileHandle queue:(dispatch_queue_t)queue error:(NSError **)error
 {
   FBFileWriter_Async *writer = [[FBFileWriter_Async alloc] initWithFileHandle:fileHandle writeQueue:queue];
   if (![writer startReadingWithError:error]) {
     return nil;
   }
-  return writer;
+  return [FBDataConsumerAdaptor dataConsumerForDispatchDataConsumer:writer];
 }
 
-+ (instancetype)asyncWriterWithFileHandle:(NSFileHandle *)fileHandle error:(NSError **)error
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)asyncWriterWithFileHandle:(NSFileHandle *)fileHandle error:(NSError **)error
 {
   dispatch_queue_t queue = self.createWorkQueue;
   return [self asyncWriterWithFileHandle:fileHandle queue:queue error:error];
 }
 
-+ (nullable instancetype)syncWriterForFilePath:(NSString *)filePath error:(NSError **)error
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)syncWriterForFilePath:(NSString *)filePath error:(NSError **)error
 {
   NSFileHandle *fileHandle = [self fileHandleForPath:filePath error:error];
   if (!fileHandle) {
@@ -97,7 +106,7 @@
   return [FBFileWriter syncWriterWithFileHandle:fileHandle];
 }
 
-+ (FBFuture<FBFileWriter *> *)asyncWriterForFilePath:(NSString *)filePath
++ (FBFuture<id<FBDataConsumer, FBDataConsumerLifecycle>> *)asyncWriterForFilePath:(NSString *)filePath
 {
   dispatch_queue_t queue = self.createWorkQueue;
   return [[FBFuture
@@ -110,7 +119,7 @@
       if (![writer startReadingWithError:&error]) {
         return [FBFuture futureWithError:error];
       }
-      return [FBFuture futureWithResult:writer];
+      return [FBFuture futureWithResult:[FBDataConsumerAdaptor dataConsumerForDispatchDataConsumer:writer]];
     }];
 }
 
@@ -122,71 +131,60 @@
   }
 
   _fileHandle = fileHandle;
+  _eofHasBeenReceivedMutable = [FBMutableFuture futureWithName:@"EOF Recieved"];
 
   return self;
-}
-
-#pragma mark Public Methods
-
-- (void)consumeData:(NSData *)data
-{
-  NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
-}
-
-- (void)consumeEndOfFile
-{
-  [self consumeEndOfFileClosingFileHandle:YES];
-}
-
-#pragma mark Private
-
-- (void)consumeEndOfFileClosingFileHandle:(BOOL)close
-{
-  NSAssert(NO, @"-[%@ %@] is abstract and should be overridden", NSStringFromClass(self.class), NSStringFromSelector(_cmd));
-}
-
-#pragma mark NSObject
-
-- (void)dealloc
-{
-  // Cleans up resources, but don't force-close the file handle.
-  [self consumeEndOfFileClosingFileHandle:NO];
 }
 
 @end
 
 @implementation FBFileWriter_Null
 
-- (void)consumeData:(NSData *)data
+#pragma mark FBDataConsumer
+
+- (void)consumeData:(dispatch_data_t)data
 {
   // do nothing
 }
 
-- (void)consumeEndOfFileClosingFileHandle:(BOOL)close
+- (void)consumeEndOfFile
 {
-  // do nothing
+  [self.eofHasBeenReceivedMutable resolveWithResult:NSNull.null];
+}
+
+- (FBFuture<NSNull *> *)eofHasBeenReceived
+{
+  return self.eofHasBeenReceivedMutable;
 }
 
 @end
 
 @implementation FBFileWriter_Sync
 
-- (void)consumeData:(NSData *)data
+#pragma mark FBDataConsumer
+
+- (void)consumeData:(dispatch_data_t)data
 {
-  [self.fileHandle writeData:data];
+  [self.fileHandle writeData:[FBDataConsumerAdaptor adaptDispatchData:data]];
 }
 
-- (void)consumeEndOfFileClosingFileHandle:(BOOL)close
+- (void)consumeEndOfFile
 {
-  if (close) {
-    [self.fileHandle closeFile];
-  }
+  [self.eofHasBeenReceivedMutable resolveWithResult:NSNull.null];
+  [self.fileHandle closeFile];
   self.fileHandle = nil;
+}
+
+- (FBFuture<NSNull *> *)eofHasBeenReceived
+{
+  return self.eofHasBeenReceivedMutable;
 }
 
 @end
 
 @implementation FBFileWriter_Async
+
+#pragma mark Initializers
 
 - (instancetype)initWithFileHandle:(NSFileHandle *)fileHandle writeQueue:(dispatch_queue_t)writeQueue
 {
@@ -200,20 +198,62 @@
   return self;
 }
 
-#pragma mark Lifecycle
+#pragma mark FBDataConsumer
+
+- (void)consumeData:(dispatch_data_t)data
+{
+  NSParameterAssert(self.io);
+
+  dispatch_io_write(self.io, 0, data, self.writeQueue, ^(bool done, dispatch_data_t remainder, int error) {});
+}
+
+- (void)consumeEndOfFile
+{
+  NSParameterAssert(self.io);
+  [self.eofHasBeenReceivedMutable resolveWithResult:NSNull.null];
+
+  // We can't close the file handle right now since there may still be pending IO operations on the channel.
+  // The safe place to do this is within the dispatch_io_create cleanup_handler callback.
+  // Until the cleanup_handler is called, libdispatch takes over control of the file descriptor.
+  // We also want to ensure that there are no pending write operations on the channel, otherwise it's easy to miss data.
+  // The barrier ensures that there are no pending writes before we attempt to interrupt the channel.
+  dispatch_io_barrier(self.io, ^{
+    dispatch_io_close(self.io, DISPATCH_IO_STOP);
+  });
+}
+
+- (FBFuture<NSNull *> *)eofHasBeenReceived
+{
+  return self.eofHasBeenReceivedMutable;
+}
+
+#pragma mark Private
 
 - (BOOL)startReadingWithError:(NSError **)error
 {
-  NSParameterAssert(self.io == NULL);
-  NSFileHandle *fileHandle = self.fileHandle;
+  NSParameterAssert(!self.io);
 
   // If there is an error creating the IO Object, the errorCode will be delivered asynchronously.
-  self.io = dispatch_io_create(DISPATCH_IO_STREAM, fileHandle.fileDescriptor, self.writeQueue, ^(int errorCode) {
-    self.errorCode = errorCode;
+  // Having a self -> IO -> self cycle shouldn't be a problem in theory, since the cleanup handler should get when IO is done.
+  // However, it appears that having the cycle in place here means that the cleanup handler is *never* called in the following circumstance:
+  // 1) Pipe of FD14 is created.
+  // 2) A writer is created for this pipe
+  // 3) Data is written to this writer
+  // 4) `consumeEndOfFile` is called and subsequently dispatch_io_close.
+  // 5) The cleanup handler is called and subsequently the FD closed and IO channel disposed of via nil-ification.
+  // 6) Pipe FD14 is torn down.
+  // 7) A new Pipe resolving to FD14 is created.
+  // 8) Data is written to this writer
+  // 9) `consumeEndOfFile` is called and subsequently dispatch_io_close.
+  // 10) The cleanup handler is *never* called and the FD is therefore never closed.
+  // This isn't a problem in practice if different FDs are splayed, but repeating FDs representing different dispatch channels will cause this problem.
+  __weak typeof(self) weakSelf = self;
+  self.io = dispatch_io_create(DISPATCH_IO_STREAM, self.fileHandle.fileDescriptor, self.writeQueue, ^(int errorCode) {
+    [weakSelf ioChannelDidCloseWithError:errorCode];
   });
   if (!self.io) {
     return [[FBControlCoreError
-      describeFormat:@"A IO Channel could not be created for fd %d", fileHandle.fileDescriptor]
+      describeFormat:@"A IO Channel could not be created for fd %d", self.fileHandle.fileDescriptor]
       failBool:error];
   }
 
@@ -222,38 +262,11 @@
   return YES;
 }
 
-- (void)consumeData:(NSData *)data
+- (void)ioChannelDidCloseWithError:(int)errorCode
 {
-  if (!self.io) {
-    return;
-  }
-
-  dispatch_data_t dispatchData = dispatch_data_create(data.bytes, data.length, self.writeQueue, ^{
-    // Retain the data, so that it isn't released and the buffer freed before it is used in dispatch_io_write.
-    (void) data;
-  });
-  dispatch_io_write(self.io, 0, dispatchData, self.writeQueue, ^(bool done, dispatch_data_t remainder, int error) {});
-}
-
-- (void)consumeEndOfFileClosingFileHandle:(BOOL)close
-{
-  if (!self.io) {
-    return;
-  }
-
-  // Remove resources form self to be closed in the io barrier.
-  NSFileHandle *fileHandle = self.fileHandle;
+  [self.fileHandle closeFile];
   self.fileHandle = nil;
-  dispatch_io_t io = self.io;
   self.io = nil;
-
-  // Wait for all io operations to stop with a barrier, then close the io channel
-  dispatch_io_barrier(io, ^{
-    dispatch_io_close(io, DISPATCH_IO_STOP);
-    if (close) {
-      [fileHandle closeFile];
-    }
-  });
 }
 
 @end

@@ -11,7 +11,10 @@
 
 #import <FBControlCore/FBControlCore.h>
 
-@interface FBFileReaderTests : XCTestCase <FBFileConsumer>
+#import <sys/types.h>
+#import <sys/stat.h>
+
+@interface FBFileReaderTests : XCTestCase <FBDataConsumer>
 
 @property (atomic, assign, readwrite) BOOL didRecieveEOF;
 
@@ -28,14 +31,16 @@
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  id<FBAccumulatingLineBuffer> consumer = FBLineBuffer.accumulatingBuffer;
-  FBFileReader *writer = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer];
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer logger:nil];
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
   NSError *error = nil;
-  BOOL success = [[writer startReading] await:&error] != nil;
+  BOOL success = [[reader startReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   // Write some data and confirm that it is as expected.
   NSData *expected = [@"Foo Bar Baz" dataUsingEncoding:NSUTF8StringEncoding];
@@ -48,20 +53,24 @@
   [self waitForExpectations:@[expectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
 
   // Stop reading
-  success = [[writer stopReading] await:&error] != nil;
+  NSNumber *result = [[reader stopReading] await:&error];
   XCTAssertNil(error);
-  XCTAssertTrue(success);
+  XCTAssertEqualObjects(result, @0);
+  XCTAssertEqualObjects(reader.finishedReading.result, @0);
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingNormally);
 }
 
 - (void)testConsumesEOFAfterStoppedReading
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  FBFileReader *writer = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:self];
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:self logger:nil];
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
   NSError *error = nil;
-  BOOL success = [[writer startReading] await:&error] != nil;
+  BOOL success = [[reader startReading] await:&error] != nil;
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
   XCTAssertNil(error);
   XCTAssertTrue(success);
 
@@ -72,7 +81,45 @@
   // Stop reading, we may recieve the consumeEndOfFile on a different queue
   // This is fine as this call will block until the call has happened.
   // Also the assignment is atomic.
-  success = [[writer stopReading] await:&error] != nil;
+  NSNumber *result = [[reader stopReading] await:&error];
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(result, @(ECANCELED));
+  XCTAssertEqualObjects(reader.finishedReading.result, @(ECANCELED));
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
+
+  // Confirm we got an eof
+  XCTAssertTrue(self.didRecieveEOF);
+}
+
+- (void)testConsumesEOFAfterStoppedReadingEvenIfOtherEndOfFifoDoesNotClose
+{
+  NSString *fifoPath = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
+  int status = mkfifo(fifoPath.UTF8String, S_IWUSR | S_IRUSR);
+  XCTAssertEqual(status, 0);
+
+  NSError *error = nil;
+  NSArray<id> *writerAndReader = [[FBFuture
+    futureWithFutures:@[
+      [FBFileWriter asyncWriterForFilePath:fifoPath],
+      [FBFileReader readerWithFilePath:fifoPath consumer:self logger:nil],
+    ]]
+    await:&error];
+  XCTAssertNil(error);
+  XCTAssertNotNil(writerAndReader);
+
+  id<FBDataConsumer> writer = writerAndReader[0];
+  FBFileReader *reader = writerAndReader[1];
+
+  BOOL success = [[reader startReading] await:&error] != nil;
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+
+  // Write some data
+  [writer consumeData:[@"HELLO\n" dataUsingEncoding:NSUTF8StringEncoding]];
+  [writer consumeData:[@"THERE\n" dataUsingEncoding:NSUTF8StringEncoding]];
+  [writer consumeEndOfFile];
+
+  success = [[reader stopReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
 
@@ -84,14 +131,16 @@
 {
   // Setup
   NSPipe *pipe = NSPipe.pipe;
-  id<FBAccumulatingLineBuffer> consumer = FBLineBuffer.accumulatingBuffer;
-  FBFileReader *writer = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer];
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer logger:nil];
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
   NSError *error = nil;
-  BOOL success = [[writer startReading] await:&error] != nil;
+  BOOL success = [[reader startReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   // Write some data and confirm that it is as expected.
   NSData *expected = [@"Foo Bar Baz" dataUsingEncoding:NSUTF8StringEncoding];
@@ -103,88 +152,167 @@
   [self waitForExpectations:@[expectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
 
   // Stop reading, it shouldn't matter that an EOF wasn't sent
-  FBFuture<NSNull *> *stopFuture = [writer stopReading];
-  success = [stopFuture await:&error] != nil;
+  NSNumber *result = [[reader stopReading] await:&error];
   XCTAssertNil(error);
-  XCTAssertTrue(success);
+  XCTAssertEqualObjects(result, @(ECANCELED));
+  XCTAssertEqualObjects(reader.finishedReading.result, @(ECANCELED));
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
 
   // Write EOF
   [pipe.fileHandleForWriting closeFile];
+}
+
+- (void)testPipeClosingBehindBackOfConsumer
+{
+  // Setup
+  NSPipe *pipe = NSPipe.pipe;
+  id<FBAccumulatingBuffer> consumer = FBLineBuffer.accumulatingBuffer;
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:pipe.fileHandleForReading consumer:consumer logger:nil];
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
+
+  // Start reading
+  NSError *error = nil;
+  BOOL success = [[reader startReading] await:&error] != nil;
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
+
+  // Write some data and confirm that it is as expected.
+  NSData *expected = [@"Foo Bar Baz" dataUsingEncoding:NSUTF8StringEncoding];
+  [pipe.fileHandleForWriting writeData:expected];
+  [pipe.fileHandleForWriting closeFile];
+  NSPredicate *predicate = [NSPredicate predicateWithBlock:^ BOOL (id _, id __) {
+    return [expected isEqualToData:consumer.data];
+  }];
+  XCTestExpectation *expectation = [self expectationForPredicate:predicate evaluatedWithObject:self handler:nil];
+  [self waitForExpectations:@[expectation] timeout:FBControlCoreGlobalConfiguration.fastTimeout];
+
+  // Stop reading, it shouldn't matter that an EOF wasn't sent
+  NSNumber *result = [[reader stopReading] await:&error];
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(result, @0);
+  XCTAssertEqualObjects(reader.finishedReading.result, @0);
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingNormally);
 }
 
 - (void)testReadsFromFilePath
 {
   // Read some data.
   NSError *error = nil;
-  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self] await:&error];
+  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self logger:nil] await:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(reader);
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
   BOOL success = [[reader startReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   // Stop Reading
   error = nil;
-  success = [[reader stopReading] await:&error] != nil;
+  NSNumber *result = [[reader stopReading] await:&error];
   XCTAssertNil(error);
-  XCTAssertTrue(success);
+  XCTAssertEqualObjects(result, @(ECANCELED));
+  XCTAssertEqualObjects(reader.finishedReading.result, @(ECANCELED));
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
 }
 
 - (void)testReadingTwiceFails
 {
   // Read some data.
   NSError *error = nil;
-  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self] await:&error];
+  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self logger:nil] await:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(reader);
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading.
   BOOL success = [[reader startReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   // Fail when starting again.
   error = nil;
   success = [[reader startReading] await:&error] != nil;
   XCTAssertNotNil(error);
-  XCTAssertFalse(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
+
+  // Cancellation should work.
+  error = nil;
+  NSNumber *result = [[reader stopReading] await:&error];
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(result, @(ECANCELED));
+  XCTAssertEqualObjects(reader.finishedReading.result, @(ECANCELED));
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
 }
 
-- (void)testStoppingTwiceFails
+- (void)testStoppingTwiceDoesNotError
 {
   // Read some data.
   NSError *error = nil;
-  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self] await:&error];
+  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self logger:nil] await:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(reader);
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   // Start reading
   BOOL success = [[reader startReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   // Stop Reading
   error = nil;
-  success = [[reader stopReading] await:&error] != nil;
+  NSNumber *result = [[reader stopReading] await:&error];
+  XCTAssertNil(error);
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
+  XCTAssertEqualObjects(result, @(ECANCELED));
+
+  // Stop Reading
+  error = nil;
+  result = [[reader stopReading] await:&error];
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(result, @(ECANCELED));
+  XCTAssertEqualObjects(reader.finishedReading.result, @(ECANCELED));
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
+}
+
+- (void)testCancellationOnFinishedReading
+{
+  // Read some data.
+  NSError *error = nil;
+  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self logger:nil] await:&error];
+  XCTAssertNil(error);
+  XCTAssertNotNil(reader);
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
+
+  // Start reading
+  BOOL success = [[reader startReading] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   // Stop Reading
-  error = nil;
-  success = [[reader stopReading] await:&error] != nil;
-  XCTAssertNotNil(error);
-  XCTAssertFalse(success);
+  FBFuture<NSNumber *> *finished = reader.finishedReading;
+  XCTAssertEqual(finished.state, FBFutureStateRunning);
+  success = [[finished cancel] await:&error] != nil;
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+  XCTAssertEqual(finished.state, FBFutureStateCancelled);
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingByCancellation);
 }
 
 - (void)testConcurrentAttachmentIsProhibited
 {
   // Read some data.
   NSError *error = nil;
-  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self] await:&error];
+  FBFileReader *reader = [[FBFileReader readerWithFilePath:@"/dev/urandom" consumer:self logger:nil] await:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(reader);
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
   dispatch_queue_t concurrentQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
   dispatch_group_t group = dispatch_group_create();
@@ -206,6 +334,7 @@
   [firstAttempt await:nil];
   [secondAttempt await:nil];
   [thirdAttempt await:nil];
+  XCTAssertEqual(reader.state, FBFileReaderStateReading);
 
   NSUInteger successes = 0;
   if (firstAttempt.state == FBFutureStateDone) {
@@ -221,16 +350,35 @@
   XCTAssertEqual(successes, 1u);
 }
 
-#pragma mark FBFileConsumer Implementation
-
-- (void)consumeData:(NSData *)data
+- (void)testAttemptingToReadAGarbageFileDescriptor
 {
+  // Setup
+  FBFileReader *reader = [FBFileReader readerWithFileHandle:[[NSFileHandle alloc] initWithFileDescriptor:92123 closeOnDealloc:NO] consumer:self logger:nil];
+  XCTAssertEqual(reader.state, FBFileReaderStateNotStarted);
 
+  // Start reading, the start is asyncrhonous, so we can't know ahead of time if the fd is bad.
+  NSError *error = nil;
+  BOOL success = [[reader startReading] await:&error] != nil;
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+
+  // Write some data and confirm that it is as expected.
+  NSNumber *result = [[reader stopReading] await:&error];
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(result, @(EBADF));
+  XCTAssertEqualObjects(reader.finishedReading.result, @(EBADF));
+  XCTAssertEqual(reader.state, FBFileReaderStateFinishedReadingInError);
 }
+
+#pragma mark FBDataConsumer Implementation
 
 - (void)consumeEndOfFile
 {
   self.didRecieveEOF = YES;
+}
+
+- (void)consumeData:(NSData *)data
+{
 }
 
 @end

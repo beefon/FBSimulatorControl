@@ -15,7 +15,7 @@
 #import "FBiOSActionRouter.h"
 #import "FBiOSTarget.h"
 #import "FBiOSTargetFuture.h"
-#import "FBSocketReader.h"
+#import "FBSocketConnectionManager.h"
 #import "FBUploadBuffer.h"
 #import "NSRunLoop+FBControlCore.h"
 
@@ -30,15 +30,15 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
 @property (nonatomic, strong, readonly) FBiOSActionReader *reader;
 @property (nonatomic, strong, readonly) FBiOSActionRouter *router;
 @property (nonatomic, strong, readonly) id<FBiOSActionReaderDelegate> delegate;
-@property (nonatomic, strong, readonly) id<FBFileConsumer> writeBack;
-@property (nonatomic, strong, readonly) id<FBConsumableLineBuffer> lineBuffer;
+@property (nonatomic, strong, readonly) id<FBDataConsumer> writeBack;
+@property (nonatomic, strong, readonly) id<FBConsumableBuffer> lineBuffer;
 @property (nonatomic, strong, readwrite, nullable) FBUploadBuffer *uploadBuffer;
 
 @end
 
 @implementation FBiOSActionReaderMediator
 
-- (instancetype)initWithReader:(FBiOSActionReader *)reader router:(FBiOSActionRouter *)router delegate:(id<FBiOSActionReaderDelegate>)delegate writeBack:(id<FBFileConsumer>)writeBack
+- (instancetype)initWithReader:(FBiOSActionReader *)reader router:(FBiOSActionRouter *)router delegate:(id<FBiOSActionReaderDelegate>)delegate writeBack:(id<FBDataConsumer>)writeBack
 {
   self = [super init];
   if (!self) {
@@ -57,12 +57,12 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
 
 #pragma mark FBSocketConsumer Implementation
 
-- (void)writeBackAvailable:(id<FBFileConsumer>)writeBack
+- (void)writeBackAvailable:(id<FBDataConsumer>)writeBack
 {
   _writeBack = writeBack;
 }
 
-#pragma mark FBFileConsumer Implementation
+#pragma mark FBDataConsumer Implementation
 
 - (void)consumeData:(NSData *)data
 {
@@ -209,7 +209,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
   return self.delegate.interpreter;
 }
 
-- (id<FBFileConsumer>)consumer
+- (id<FBDataConsumer>)consumer
 {
   return self.delegate.consumer;
 }
@@ -228,19 +228,19 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
 
 #pragma clang diagnostic push
 
-@interface FBiOSActionSocket : FBiOSActionReader <FBSocketReaderDelegate>
+@interface FBiOSActionSocket : FBiOSActionReader <FBSocketConnectionManagerDelegate>
 
-@property (nonatomic, strong, nullable, readwrite) FBSocketReader *reader;
+@property (nonatomic, strong, nullable, readwrite) FBSocketConnectionManager *reader;
 
 - (instancetype)initWithDelegate:(id<FBiOSActionReaderDelegate>)delegate router:(FBiOSActionRouter *)router port:(in_port_t)port;
 
 @end
 
-@interface FBiOSActionFileHandle : FBiOSActionReader <FBFileConsumer>
+@interface FBiOSActionFileHandle : FBiOSActionReader <FBDataConsumer>
 
 @property (nonatomic, strong, readonly) FBiOSActionReaderMediator *mediator;
 @property (nonatomic, strong, nullable, readwrite) FBFileReader *reader;
-@property (nonatomic, strong, nullable, readwrite) FBFileWriter *writer;
+@property (nonatomic, strong, nullable, readwrite) id<FBDataConsumer> writer;
 
 - (instancetype)initWithDelegate:(id<FBiOSActionReaderDelegate>)delegate router:(FBiOSActionRouter *)router readHandle:(NSFileHandle *)readHandle writeHandle:(NSFileHandle *)writeHandle;
 
@@ -340,7 +340,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
     return nil;
   }
 
-  _reader = [FBSocketReader socketReaderOnPort:port delegate:self];
+  _reader = [FBSocketConnectionManager socketReaderOnPort:port delegate:self];
 
   return self;
 }
@@ -369,7 +369,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
   return future;
 }
 
-#pragma mark FBSocketReaderDelegate Implementation
+#pragma mark FBSocketConnectionManagerDelegate Implementation
 
 - (id<FBSocketConsumer>)consumerWithClientAddress:(struct in6_addr)clientAddress
 {
@@ -389,7 +389,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
     return nil;
   }
 
-  _reader = [FBFileReader readerWithFileHandle:readHandle consumer:self];
+  _reader = [FBFileReader readerWithFileHandle:readHandle consumer:self logger:nil];
   _writer = [FBFileWriter syncWriterWithFileHandle:writeHandle];
   _mediator = [[FBiOSActionReaderMediator alloc] initWithReader:self router:self.router delegate:self.delegate writeBack:self.writer];
 
@@ -421,7 +421,7 @@ FBiOSTargetFutureType const FBiOSTargetFutureTypeActionReader = @"action_reader"
   return future;
 }
 
-#pragma mark FBFileConsumer
+#pragma mark FBDataConsumer
 
 - (void)consumeData:(NSData *)data
 {

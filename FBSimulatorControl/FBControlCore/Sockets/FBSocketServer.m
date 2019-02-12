@@ -68,6 +68,15 @@
   return [FBFuture futureWithResult:NSNull.null];
 }
 
+- (FBFutureContext<NSNull *> *)startListeningContext
+{
+  return [[self
+    startListening]
+    onQueue:self.delegate.queue contextualTeardown:^(NSNull *_, FBFutureState __) {
+      [self stopListening];
+    }];
+}
+
 #pragma mark Private
 
 - (FBFuture<NSNull *> *)createSocketWithPort:(in_port_t)port
@@ -76,7 +85,7 @@
   int socketHandle = socket(PF_INET6, SOCK_STREAM, IPPROTO_TCP);
   if (socket <= 0) {
     return [[FBControlCoreError
-      describeFormat:@"Failed to create a socket with errno %d", errno]
+      describeFormat:@"Failed to create a socket with error '%s'", strerror(errno)]
       failFuture];
   }
   int flagTrue = 1;
@@ -92,7 +101,7 @@
   int result = bind(socketHandle, (struct sockaddr *)&address, sizeof(address));
   if (result != 0) {
     return [[FBControlCoreError
-      describeFormat:@"Failed to bind the socket with errno %d", errno]
+      describeFormat:@"Failed to bind the socket with error '%s'", strerror(errno)]
       failFuture];
   }
 
@@ -100,7 +109,7 @@
   result = listen(socketHandle, 10);
   if (result != 0) {
     return [[FBControlCoreError
-      describeFormat:@"Failed to listen on the socket with errno %d", errno]
+      describeFormat:@"Failed to listen on the socket error '%s'", strerror(errno)]
       failFuture];
   }
 
@@ -141,7 +150,7 @@
   int acceptHandle = accept(socketHandle, (struct sockaddr *) &address, &addressLength);
   if (!acceptHandle) {
     return [[FBControlCoreError
-      describeFormat:@"accept() failed with error %d", errno]
+      describeFormat:@"accept() failed with error '%s'", strerror(errno)]
       failBool:error];
   }
 

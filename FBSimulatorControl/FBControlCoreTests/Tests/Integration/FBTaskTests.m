@@ -110,7 +110,7 @@
   FBTask *task = [self runAndWaitForTaskFuture:futureTask];
 
   XCTAssertEqual(task.completed.state, FBFutureStateDone);
-  XCTAssertTrue([task.stdOut conformsToProtocol:@protocol(FBFileConsumer)]);
+  XCTAssertTrue([task.stdOut conformsToProtocol:@protocol(FBDataConsumer)]);
   XCTAssertGreaterThan(task.processIdentifier, 1);
 
   [[[FBFuture futureWithResult:NSNull.null] delay:2] await:nil];
@@ -217,7 +217,7 @@
     withStdErrToDevNull]
     startSynchronously];
 
-  XCTAssertTrue([task.stdIn conformsToProtocol:@protocol(FBFileConsumer)]);
+  XCTAssertTrue([task.stdIn conformsToProtocol:@protocol(FBDataConsumer)]);
   [task.stdIn consumeData:expected];
   [task.stdIn consumeEndOfFile];
 
@@ -315,9 +315,51 @@
   BOOL success = [[task sendSignal:SIGHUP backingOfToKillWithTimeout:0.5] await:&error] != nil;
   XCTAssertNil(error);
   XCTAssertTrue(success);
-  XCTAssertEqual(task.completed.state, FBFutureStateDone);
   XCTAssertEqual(task.exitCode.state, FBFutureStateDone);
   XCTAssertEqual(task.exitCode.result, @(SIGKILL));
+
+  success = [task.completed await:&error] != nil;
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+  XCTAssertEqual(task.completed.state, FBFutureStateDone);
+}
+
+- (void)testPipingInputToSuccessivelyRunTasksSucceeds
+{
+  NSString *tarSource = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.tar.gz", NSUUID.UUID.UUIDString]];
+  NSString *tarDestination = [tarSource stringByAppendingString:@".destination"];
+
+  NSError *error = nil;
+  BOOL success = [NSFileManager.defaultManager createDirectoryAtPath:tarDestination withIntermediateDirectories:YES attributes:nil error:&error];
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+
+  success = [[[[[[[FBTaskBuilder
+    withLaunchPath:@"/usr/bin/tar"]
+    withArguments:@[@"-zcvf", tarSource, FBControlCoreFixtures.bundleResource]]
+    withStdOutToDevNull]
+    withStdErrToDevNull]
+    runUntilCompletion]
+    mapReplace:NSNull.null]
+    await:&error] != nil;
+  XCTAssertNil(error);
+  XCTAssertTrue(success);
+
+  NSData *tarData = [NSData dataWithContentsOfFile:tarSource];
+
+  for (NSUInteger count = 0; count < 10; count++) {
+    success = [[[[[[[[FBTaskBuilder
+      withLaunchPath:@"/usr/bin/tar"]
+      withArguments:@[@"-C", tarDestination, @"-zxpf", @"-"]]
+      withStdInFromData:tarData]
+      withStdOutToDevNull]
+      withStdErrToDevNull]
+      runUntilCompletion]
+      mapReplace:NSNull.null]
+      await:&error] != nil;
+    XCTAssertNil(error);
+    XCTAssertTrue(success);
+  }
 }
 
 @end

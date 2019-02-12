@@ -1,24 +1,163 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 
-#import "FBFileConsumer.h"
+#import "FBDataConsumer.h"
 
 #import "FBCollectionInformation.h"
 #import "FBControlCoreError.h"
 #import "FBControlCoreLogger.h"
 
-@interface FBLineBuffer_Accumilating : NSObject <FBAccumulatingLineBuffer>
+@interface FBDataConsumerAdaptor ()
+
++ (dispatch_data_t)adaptNSData:(NSData *)dispatchData;
+
+@end
+
+@interface FBDataConsumerAdaptor_ToNSData : NSObject <FBDispatchDataConsumer>
+
+@property (nonatomic, strong, readonly) id<FBDataConsumer> consumer;
+
+@end
+
+@implementation FBDataConsumerAdaptor_ToNSData
+
+#pragma mark Initializers
+
+- (instancetype)initWithConsumer:(id<FBDataConsumer>)consumer
+{
+  self = [super init];
+  if (!self) {
+    return nil;
+  }
+
+  _consumer = consumer;
+
+  return self;
+}
+
+#pragma mark FBDataConsumer
+
+- (void)consumeData:(dispatch_data_t)dispatchData
+{
+  NSData *data = [FBDataConsumerAdaptor adaptDispatchData:dispatchData];
+  [self.consumer consumeData:data];
+}
+
+- (void)consumeEndOfFile
+{
+  [self.consumer consumeEndOfFile];
+}
+
+@end
+
+@interface FBDataConsumerAdaptor_ToDispatchData : NSObject <FBDataConsumer, FBDataConsumerLifecycle>
+
+@property (nonatomic, strong, readonly) id<FBDispatchDataConsumer, FBDataConsumerLifecycle> consumer;
+
+@end
+
+@implementation FBDataConsumerAdaptor_ToDispatchData
+
+#pragma mark Initializers
+
+- (instancetype)initWithConsumer:(id<FBDispatchDataConsumer, FBDataConsumerLifecycle>)consumer
+{
+  self = [super init];
+  if (!self) {
+    return nil;
+  }
+
+  _consumer = consumer;
+
+  return self;
+}
+
+#pragma mark FBDataConsumer
+
+- (void)consumeData:(NSData *)data
+{
+  dispatch_data_t dispatchData = [FBDataConsumerAdaptor adaptNSData:data];
+  [self.consumer consumeData:dispatchData];
+}
+
+- (void)consumeEndOfFile
+{
+  [self.consumer consumeEndOfFile];
+}
+
+- (FBFuture<NSNull *> *)eofHasBeenReceived
+{
+  return self.consumer.eofHasBeenReceived;
+}
+
+@end
+
+@implementation FBDataConsumerAdaptor
+
+#pragma mark Initializers
+
++ (id<FBDispatchDataConsumer>)dispatchDataConsumerForDataConsumer:(id<FBDataConsumer>)consumer;
+{
+  return [[FBDataConsumerAdaptor_ToNSData alloc] initWithConsumer:consumer];
+}
+
++ (id<FBDataConsumer, FBDataConsumerLifecycle>)dataConsumerForDispatchDataConsumer:(id<FBDispatchDataConsumer, FBDataConsumerLifecycle>)consumer;
+{
+  return [[FBDataConsumerAdaptor_ToDispatchData alloc] initWithConsumer:consumer];
+}
+
+#pragma mark Public
+
++ (NSData *)adaptDispatchData:(dispatch_data_t)dispatchData
+{
+  // One-way bridging of dispatch_data_t to NSData is permitted.
+  // Since we can't safely assume all consumers of the NSData work discontiguous ranges, we have to make the dispatch_data contiguous.
+  // This is done with dispatch_data_create_map, which is 0-copy for a contiguous range but copies for non-contiguous ranges.
+  // https://twitter.com/catfish_man/status/393032222808100864
+  // https://developer.apple.com/library/archive/releasenotes/Foundation/RN-Foundation-older-but-post-10.8/
+  return (NSData *) dispatch_data_create_map(dispatchData, NULL, NULL);
+}
+
+#pragma mark Private
+
++ (dispatch_data_t)adaptNSData:(NSData *)data __attribute__((no_sanitize("nullability-arg")))
+{
+  // The safest possible way of adapting the NSData to dispatch_data_t is to ensure that buffer backing the dispatch_data_t data is:
+  // 1) Immutable
+  // 2) Is not freed until the dispatch_data_t is destroyed.
+  // There are two ways of doing this:
+  // 1) Copy the NSData, and retain it for the lifecycle of the dispatch_data_t.
+  // 2) Use DISPATCH_DATA_DESTRUCTOR_DEFAULT which will copy the underlying buffer.
+  // This uses #2 as it's preferable to let libdispatch do the management itself and avoids an object copy (NSData) as well as a potential buffer copy in `-[NSData copy]`.
+  // It can be quite surprising how many methods result in the creation of NSMutableData, for example `-[NSString dataUsingEncoding:]` can result in NSConcreteMutableData.
+  // By copying the buffer we are sure that the data in the dispatch wrapper is completely immutable.
+  return dispatch_data_create(
+    data.bytes,
+    data.length,
+    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+    DISPATCH_DATA_DESTRUCTOR_DEFAULT
+  );
+}
+
+@end
+
+
+@interface FBLineBuffer_Accumilating : NSObject <FBDataConsumer, FBAccumulatingBuffer>
 
 @property (nonatomic, strong, readwrite) NSMutableData *buffer;
-@property (nonatomic, strong, readonly) NSData *terminalData;
 @property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *eofHasBeenReceivedFuture;
 
 @end
 
-@interface FBLineBuffer_Consumable : FBLineBuffer_Accumilating <FBConsumableLineBuffer>
+@interface FBLineBuffer_Consumable : FBLineBuffer_Accumilating <FBConsumableBuffer>
+
+@property (nonatomic, copy, nullable, readwrite) NSData *notificationTerminal;
+@property (nonatomic, strong, nullable, readwrite) FBMutableFuture<NSData *> *notification;
 
 @end
 
 @implementation FBLineBuffer_Accumilating
+
+#pragma mark Initializers
 
 - (instancetype)init
 {
@@ -33,10 +172,19 @@
   }
 
   _buffer = buffer;
-  _terminalData = [NSData dataWithBytes:"\n" length:1];
   _eofHasBeenReceivedFuture = FBMutableFuture.future;
 
   return self;
+}
+
++ (NSData *)newlineTerminal
+{
+  static dispatch_once_t onceToken;
+  static NSData *data = nil;
+  dispatch_once(&onceToken, ^{
+    data = [NSData dataWithBytes:"\n" length:1];
+  });
+  return data;
 }
 
 #pragma mark NSObject
@@ -63,7 +211,7 @@
   return [output componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet];
 }
 
-#pragma mark FBFileConsumer
+#pragma mark FBDataConsumer
 
 - (void)consumeData:(NSData *)data
 {
@@ -81,7 +229,7 @@
   }
 }
 
-#pragma mark FBFileConsumerLifecycle
+#pragma mark FBDataConsumerLifecycle
 
 - (FBFuture<NSNull *> *)eofHasBeenReceived
 {
@@ -101,7 +249,7 @@
   }
 }
 
-#pragma mark FBConsumableLineBuffer
+#pragma mark FBConsumableBuffer
 
 - (nullable NSData *)consumeCurrentData
 {
@@ -118,18 +266,23 @@
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
-- (nullable NSData *)consumeLineData
+- (nullable NSData *)consumeUntil:(NSData *)terminal
 {
   if (self.buffer.length == 0) {
     return nil;
   }
-  NSRange newlineRange = [self.buffer rangeOfData:self.terminalData options:0 range:NSMakeRange(0, self.buffer.length)];
+  NSRange newlineRange = [self.buffer rangeOfData:terminal options:0 range:NSMakeRange(0, self.buffer.length)];
   if (newlineRange.location == NSNotFound) {
     return nil;
   }
   NSData *lineData = [self.buffer subdataWithRange:NSMakeRange(0, newlineRange.location)];
-  [self.buffer replaceBytesInRange:NSMakeRange(0, newlineRange.location + 1) withBytes:"" length:0];
+  [self.buffer replaceBytesInRange:NSMakeRange(0, newlineRange.location + terminal.length) withBytes:"" length:0];
   return lineData;
+}
+
+- (nullable NSData *)consumeLineData
+{
+  return [self consumeUntil:FBLineBuffer_Accumilating.newlineTerminal];
 }
 
 - (nullable NSString *)consumeLineString
@@ -141,34 +294,71 @@
   return [[NSString alloc] initWithData:lineData encoding:NSUTF8StringEncoding];
 }
 
+- (FBFuture<NSString *> *)consumeAndNotifyWhen:(NSData *)terminal
+{
+  @synchronized (self) {
+    if (self.notificationTerminal) {
+      return [[FBControlCoreError
+        describe:@"Cannot listen for the two terminals at the same time"]
+        failFuture];
+    }
+    NSData *partial = [self consumeUntil:terminal];
+    if (partial) {
+      return [FBFuture futureWithResult:partial];
+    }
+    self.notificationTerminal = terminal;
+    self.notification = FBMutableFuture.future;
+    return self.notification;
+  }
+}
+
+#pragma mark FBDataConsumer
+
+- (void)consumeData:(NSData *)data
+{
+  [super consumeData:data];
+  @synchronized (self) {
+    if (!self.notificationTerminal) {
+      return;
+    }
+    NSData *partial = [self consumeUntil:self.notificationTerminal];
+    if (!partial) {
+      return;
+    }
+    [self.notification resolveWithResult:partial];
+    self.notification = nil;
+    self.notificationTerminal = nil;
+  }
+}
+
 @end
 
 @implementation FBLineBuffer
 
 #pragma mark Initializers
 
-+ (id<FBAccumulatingLineBuffer>)accumulatingBuffer
++ (id<FBAccumulatingBuffer>)accumulatingBuffer
 {
   return [FBLineBuffer_Accumilating new];
 }
 
-+ (id<FBAccumulatingLineBuffer>)accumulatingBufferForMutableData:(NSMutableData *)data
++ (id<FBAccumulatingBuffer>)accumulatingBufferForMutableData:(NSMutableData *)data
 {
   return [[FBLineBuffer_Accumilating alloc] initWithBackingBuffer:data];
 }
 
-+ (id<FBConsumableLineBuffer>)consumableBuffer
++ (id<FBConsumableBuffer>)consumableBuffer
 {
   return [FBLineBuffer_Consumable new];
 }
 
 @end
 
-@interface FBLineFileConsumer ()
+@interface FBLineDataConsumer ()
 
 @property (nonatomic, strong, nullable, readwrite) dispatch_queue_t queue;
 @property (nonatomic, copy, nullable, readwrite) void (^consumer)(NSData *);
-@property (nonatomic, strong, readwrite) id<FBConsumableLineBuffer> buffer;
+@property (nonatomic, strong, readwrite) id<FBConsumableBuffer> buffer;
 @property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *eofHasBeenReceivedFuture;
 
 @end
@@ -181,7 +371,7 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
   };
 }
 
-@implementation FBLineFileConsumer
+@implementation FBLineDataConsumer
 
 #pragma mark Initializers
 
@@ -221,7 +411,7 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
   return self;
 }
 
-#pragma mark FBFileConsumer
+#pragma mark FBDataConsumer
 
 - (void)consumeData:(NSData *)data
 {
@@ -245,7 +435,7 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
   }
 }
 
-#pragma mark FBFileConsumerLifecycle
+#pragma mark FBDataConsumerLifecycle
 
 - (FBFuture<NSNull *> *)eofHasBeenReceived
 {
@@ -279,7 +469,7 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
 
 @end
 
-@implementation FBLoggingFileConsumer
+@implementation FBLoggingDataConsumer
 
 #pragma mark Initializers
 
@@ -300,7 +490,7 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
   return self;
 }
 
-#pragma mark FBFileConsumer
+#pragma mark FBDataConsumer
 
 - (void)consumeData:(NSData *)data
 {
@@ -322,23 +512,23 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
 
 @end
 
-@interface FBCompositeFileConsumer ()
+@interface FBCompositeDataConsumer ()
 
-@property (nonatomic, copy, readonly) NSArray<id<FBFileConsumer>> *consumers;
+@property (nonatomic, copy, readonly) NSArray<id<FBDataConsumer>> *consumers;
 @property (nonatomic, strong, readonly) FBMutableFuture<NSNull *> *eofHasBeenReceivedFuture;
 
 @end
 
-@implementation FBCompositeFileConsumer
+@implementation FBCompositeDataConsumer
 
 #pragma mark Initializers
 
-+ (instancetype)consumerWithConsumers:(NSArray<id<FBFileConsumer>> *)consumers
++ (instancetype)consumerWithConsumers:(NSArray<id<FBDataConsumer>> *)consumers
 {
   return [[self alloc] initWithConsumers:consumers];
 }
 
-- (instancetype)initWithConsumers:(NSArray<id<FBFileConsumer>> *)consumers
+- (instancetype)initWithConsumers:(NSArray<id<FBDataConsumer>> *)consumers
 {
   self = [super init];
   if (!self) {
@@ -358,24 +548,24 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
   return [NSString stringWithFormat:@"Composite Consumer %@", [FBCollectionInformation oneLineDescriptionFromArray:self.consumers]];
 }
 
-#pragma mark FBFileConsumer
+#pragma mark FBDataConsumer
 
 - (void)consumeData:(NSData *)data
 {
-  for (id<FBFileConsumer> consumer in self.consumers) {
+  for (id<FBDataConsumer> consumer in self.consumers) {
     [consumer consumeData:data];
   }
 }
 
 - (void)consumeEndOfFile
 {
-  for (id<FBFileConsumer> consumer in self.consumers) {
+  for (id<FBDataConsumer> consumer in self.consumers) {
     [consumer consumeEndOfFile];
   }
   [self.eofHasBeenReceivedFuture resolveWithResult:NSNull.null];
 }
 
-#pragma mark FBFileConsumerLifecycle
+#pragma mark FBDataConsumerLifecycle
 
 - (FBFuture<NSNull *> *)eofHasBeenReceived
 {
@@ -384,9 +574,9 @@ static inline dataBlock FBDataConsumerBlock (void(^consumer)(NSString *)) {
 
 @end
 
-@implementation FBNullFileConsumer
+@implementation FBNullDataConsumer
 
-#pragma mark FBFileConsumer
+#pragma mark FBDataConsumer
 
 - (void)consumeData:(NSData *)data
 {

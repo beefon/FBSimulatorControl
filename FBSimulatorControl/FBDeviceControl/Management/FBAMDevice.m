@@ -174,7 +174,10 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
     self.devices[udid] = device;
   }
   AMDeviceRef oldDevice = device.amDevice;
-  if (amDevice != oldDevice) {
+  if (oldDevice == NULL) {
+    [self.logger logFormat:@"New Device '%@' appeared for the first time", amDevice];
+    device.amDevice = amDevice;
+  } else if (amDevice != oldDevice) {
     [self.logger logFormat:@"New Device '%@' replaces Old Device '%@'", amDevice, oldDevice];
     device.amDevice = amDevice;
   } else {
@@ -191,7 +194,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
   if (!device) {
     [self.logger logFormat:@"No Device named %@ from inflated devices, nothing to remove", udid];
     return;
-  }
+  } 
   [self.logger logFormat:@"Removing Device %@ from inflated devices", udid];
   [self.devices removeObjectForKey:udid];
   [NSNotificationCenter.defaultCenter postNotificationName:FBAMDeviceNotificationNameDeviceDetached object:device.udid];
@@ -242,6 +245,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
   calls->Disconnect = FBGetSymbolFromHandle(handle, "AMDeviceDisconnect");
   calls->IsPaired = FBGetSymbolFromHandle(handle, "AMDeviceIsPaired");
   calls->LookupApplications = FBGetSymbolFromHandle(handle, "AMDeviceLookupApplications");
+  calls->MountImage = FBGetSymbolFromHandle(handle, "AMDeviceMountImage");
   calls->NotificationSubscribe = FBGetSymbolFromHandle(handle, "AMDeviceNotificationSubscribe");
   calls->NotificationUnsubscribe = FBGetSymbolFromHandle(handle, "AMDeviceNotificationUnsubscribe");
   calls->Release = FBGetSymbolFromHandle(handle, "AMDeviceRelease");
@@ -254,6 +258,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
   calls->ServiceConnectionGetSocket = FBGetSymbolFromHandle(handle, "AMDServiceConnectionGetSocket");
   calls->ServiceConnectionInvalidate = FBGetSymbolFromHandle(handle, "AMDServiceConnectionInvalidate");
   calls->ServiceConnectionReceive = FBGetSymbolFromHandle(handle, "AMDServiceConnectionReceive");
+  calls->ServiceConnectionSend = FBGetSymbolFromHandle(handle, "AMDServiceConnectionSend");
   calls->SetLogLevel = FBGetSymbolFromHandle(handle, "AMDSetLogLevel");
   calls->StartSession = FBGetSymbolFromHandle(handle, "AMDeviceStartSession");
   calls->StopSession = FBGetSymbolFromHandle(handle, "AMDeviceStopSession");
@@ -342,7 +347,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
       [self.logger logFormat:@"Service %@ started", service];
       return [[FBFuture
         futureWithResult:connection]
-        onQueue:self.workQueue contextualTeardown:^(id _) {
+        onQueue:self.workQueue contextualTeardown:^(id _, FBFutureState __) {
           [self.logger logFormat:@"Invalidating service %@", service];
           NSError *error = nil;
           if (![connection invalidateWithError:&error]) {
@@ -361,6 +366,7 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
 
 - (FBFutureContext<FBAMDServiceConnection *> *)startTestManagerService
 {
+  // See XCTDaemonControlMobileDevice in Xcode.
   return [self startService:@"com.apple.testmanagerd.lockdown"];
 }
 
@@ -389,9 +395,9 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
   [logger log:@"Connecting to AMDevice"];
   int status = self.calls.Connect(amDevice);
   if (status != 0) {
-    NSString *errorDecription = CFBridgingRelease(self.calls.CopyErrorText(status));
+    NSString *errorDescription = CFBridgingRelease(self.calls.CopyErrorText(status));
     return [[FBDeviceControlError
-      describeFormat:@"Failed to connect to device. (%@)", errorDecription]
+      describeFormat:@"Failed to connect to device. (%@)", errorDescription]
       failFuture];
   }
 
@@ -399,9 +405,9 @@ static const NSTimeInterval ServiceReuseTimeout = 6.0;
   status = self.calls.StartSession(amDevice);
   if (status != 0) {
     self.calls.Disconnect(amDevice);
-    NSString *errorDecription = CFBridgingRelease(self.calls.CopyErrorText(status));
+    NSString *errorDescription = CFBridgingRelease(self.calls.CopyErrorText(status));
     return [[FBDeviceControlError
-      describeFormat:@"Failed to start session with device. (%@)", errorDecription]
+      describeFormat:@"Failed to start session with device. (%@)", errorDescription]
       failFuture];
   }
 
@@ -445,11 +451,12 @@ static NSString *const CacheValuesPurpose = @"cache_values";
   if (!device) {
     return NO;
   }
+  _architecture = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("CPUArchitecture")));
+  _buildVersion = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("BuildVersion")));
   _deviceName = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("DeviceName")));
   _modelName = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("DeviceClass")));
-  _systemVersion = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("ProductVersion")));
   _productType = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("ProductType")));
-  _architecture = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("CPUArchitecture")));
+  _productVersion = CFBridgingRelease(self.calls.CopyValue(device.amDevice, NULL, CFSTR("ProductVersion")));
 
   NSString *osVersion = [FBAMDevice osVersionForDevice:device.amDevice calls:self.calls];
   _deviceConfiguration = FBiOSTargetConfiguration.productTypeToDevice[self->_productType];

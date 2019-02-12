@@ -21,6 +21,8 @@
  */
 @interface FBiOSDeviceOperator : NSObject <FBDeviceOperator>
 
+#pragma mark Initializers
+
 /**
  Creates a new Device Operator for the provided Device.
 
@@ -28,5 +30,15 @@
  @return a new FBiOSDeviceOperator instance.
  */
 + (instancetype)forDevice:(FBDevice *)device;
+
+#pragma mark Public Methods
+
+/**
+ Kills application with the given bundle identifier.
+
+ @param bundleID bundle ID of installed application
+ @return A future that resolves successfully if the bundle was running and is now killed.
+ */
+- (FBFuture<NSNull *> *)killApplicationWithBundleID:(NSString *)bundleID;
 
 @end

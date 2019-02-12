@@ -77,6 +77,14 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 + (FBFuture<T> *)onQueue:(dispatch_queue_t)queue resolveUntil:(FBFuture<T> *(^)(void))resolveUntil;
 
 /**
+ Resolve a future synchronously, by value.
+
+ @param resolve the the block to resolve the future.
+ @return the reciever, for chaining.
+ */
++ (instancetype)resolveValue:( T(^)(NSError **) )resolve;
+
+/**
  Resolve a future asynchronously, by value.
 
  @param queue to resolve on.
@@ -119,8 +127,9 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 /**
  Cancels the asynchronous operation.
  This will always start the process of cancellation.
- Some cancellation is immediate, however there are some cases where cancellation is asynchronous.
- In these cases the future returned will not be resolved immediately.
+ Some cancellation is immediate, the returned future may resolve immediatey.
+
+ However, other cancellation operations are asynchronous, where the future will not resolve immediately.
  If you wish to wait for the cancellation to have been fully resolved, chain on the future returned.
 
  @return a Future that resolves when cancellation of all handlers has been processed.
@@ -147,9 +156,12 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 - (instancetype)onQueue:(dispatch_queue_t)queue doOnResolved:(void (^)(T))handler;
 
 /**
- Respond to a cancellation request.
- This provides the opportunity to provide asynchronous cancellation.
- This can be called multiple times for the same reference.
+ Respond to the cancellation of the reciever.
+ Since the cancellation handler can itself return a future, asynchronous cancellation is permitted.
+ This can be called multiple times for the same Future if multiple cleanup operations need to occur.
+
+ Make sure that the future that is returned from this block is itself not the same reference as the reciever.
+ Otherwise the `cancel` call will itself resolve as 'cancelled'.
 
  @param queue the queue to notify on.
  @param handler the block to invoke if cancelled.
@@ -195,20 +207,24 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 - (FBFuture *)onQueue:(dispatch_queue_t)queue handleError:(FBFuture * (^)(NSError *))handler;
 
 /**
- Creates an FBFutureContext that allows the value yielded from the future to be torn down.
+ Creates an 'context object' that allows for the value contained by a future to be torn-down when the context is done.
+ This is useful for resource cleanup, where closing a resource needs to be managed.
+ The teardown will always be called, regardless of the terminating condition of any chained future.
+ The state passed in the teardown callback is the state of the resolved future from any chaining that may happen.
+ The teardown will only be called if the reciever has resolved, as this is how the context value is resolved.
 
  @param queue the queue to perform the teardown on.
- @param action the teardown action to invoke
- @return an object that acts as a proxy to the teardown.
+ @param action the teardown action to invoke. This block will be executed after the context object is done. This also includes the state that the resultant future ended in.
+ @return a 'context object' that manages the tear-down of the reciever's value.
  */
-- (FBFutureContext<T> *)onQueue:(dispatch_queue_t)queue contextualTeardown:(void(^)(T))action;
+- (FBFutureContext<T> *)onQueue:(dispatch_queue_t)queue contextualTeardown:(void(^)(T, FBFutureState))action;
 
 /**
- Creates an FBFutureContext that allows a future to be mapped into a FBFutureContext.
+ Creates an 'context object' from a block.
 
  @param queue the queue to perform the teardown on.
- @param fmap the teardown to push
- @return an object that acts as a proxy to the teardown.
+ @param fmap the 'context object' to add.
+ @return a 'contex object' that manages the tear-down of the reciever's value.
  */
 - (FBFutureContext *)onQueue:(dispatch_queue_t)queue pushTeardown:(FBFutureContext *(^)(T))fmap;
 
@@ -270,6 +286,22 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
  */
 - (FBFuture<T> *)logCompletion:(id<FBControlCoreLogger>)logger withPurpose:(NSString *)format, ... NS_FORMAT_FUNCTION(2,3);
 
+/**
+ Rename the future.
+
+ @param name the name of the Future.
+ @return the reciever, for chaining.
+ */
+- (FBFuture<T> *)named:(NSString *)name;
+
+/**
+ Rename the future with a format string.
+
+ @param format the format string for the Future's name.
+ @return the reciever, for chaining.
+ */
+- (FBFuture<T> *)nameFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1,2);
+
 #pragma mark Properties
 
 /**
@@ -311,15 +343,26 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 /**
  A Future that can be controlled externally.
  The Future is in a 'running' state until it is resolved with the `resolve` methods.
+
+ @return a new Mutable Future.
  */
 + (FBMutableFuture<T> *)future;
 
 /**
- A Mutable Future with a Name
+ A Mutable Future with a Name.
 
  @param name the name of the Future
+ @return a new Mutable Future.
  */
 + (FBMutableFuture<T> *)futureWithName:(nullable NSString *)name;
+
+/**
+ A Mutable Future with a Formatted Name
+
+ @param format the format string for the Future's name.
+ @return a new Mutable Future.
+ */
++ (FBMutableFuture<T> *)futureWithNameFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1,2);
 
 #pragma mark Mutation
 
@@ -363,6 +406,32 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
  */
 @interface FBFutureContext <T : id> : NSObject
 
+#pragma mark Initializers
+
+/**
+ Constructs a context with no teardown.
+
+ @param future the future to wrap.
+ @return a FBFutureContext wrapping the Future.
+ */
++ (FBFutureContext<T> *)futureContextWithFuture:(FBFuture<T> *)future;
+
+/**
+ Constructs a context with no teardown, from a result.
+
+ @param result the result to wrap.
+ @return a FBFutureContext wrapping the Future.
+ */
++ (FBFutureContext<T> *)futureContextWithResult:(T)result;
+
+/**
+ Constructs a context with no teardown, from an error.
+
+ @param error an error to raise.
+ @return a new Future Context.
+ */
++ (FBFutureContext *)futureContextWithError:(NSError *)error;
+
 #pragma mark Public Methods
 
 /**
@@ -397,12 +466,23 @@ typedef NS_ENUM(NSUInteger, FBFutureState) {
 - (FBFutureContext *)onQueue:(dispatch_queue_t)queue push:(FBFutureContext * (^)(T result))fmap;
 
 /**
- An empty context that raises an error.
+ Adds a teardown to the context
 
- @param error an error to raise.
- @return a new Future Context.
+ @param queue the queue to call the teardown on
+ @param action the teardown action
+ @return a context with the teardown applied.
  */
-+ (FBFutureContext *)error:(NSError *)error;
+- (FBFutureContext *)onQueue:(dispatch_queue_t)queue contextualTeardown:(void(^)(T, FBFutureState))action;
+
+/**
+ Extracts the wrapped context, so that it can be torn-down at a later time.
+ This is designed to allow a context manager to be combined with the teardown of other long-running operations.
+
+ @param queue the queue to chain on.
+ @param enter the block that recieves two parameters. The first is the context value, the second is a future that will tear-down the context when it is resolved.
+ @return a Future that wraps the value returned from fmap.
+ */
+- (FBFuture *)onQueue:(dispatch_queue_t)queue enter:(id (^)(T result, FBMutableFuture<NSNull *> *teardown))enter;
 
 #pragma mark Properties
 

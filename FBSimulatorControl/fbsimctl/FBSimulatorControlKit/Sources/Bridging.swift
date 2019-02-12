@@ -225,7 +225,7 @@ extension FBTestLaunchConfiguration: EnvironmentAdditive {
   }
 }
 
-public typealias Writer = FBFileConsumer
+public typealias Writer = FBDataConsumer
 public extension Writer {
   func write(_ string: String) {
     var output = string
@@ -239,14 +239,14 @@ public extension Writer {
   }
 }
 
-public typealias FileHandleWriter = FBFileWriter
-public extension FileHandleWriter {
+public typealias FileHandleWriter = FBDataConsumer
+public extension FBFileWriter {
   static var stdOutWriter: FileHandleWriter {
-    return FileHandleWriter.syncWriter(with: FileHandle.standardOutput)
+    return FBFileWriter.syncWriter(with: FileHandle.standardOutput)
   }
 
   static var stdErrWriter: FileHandleWriter {
-    return FileHandleWriter.syncWriter(with: FileHandle.standardError)
+    return FBFileWriter.syncWriter(with: FileHandle.standardError)
   }
 }
 

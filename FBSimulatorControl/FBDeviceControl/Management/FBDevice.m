@@ -10,8 +10,6 @@
 #import "FBDevice.h"
 #import "FBDevice+Private.h"
 
-#import <IDEiOSSupportCore/DVTiOSDevice.h>
-
 #import <XCTestBootstrap/XCTestBootstrap.h>
 
 #import <FBControlCore/FBControlCore.h>
@@ -21,6 +19,7 @@
 #import "FBDeviceApplicationDataCommands.h"
 #import "FBDeviceControlError.h"
 #import "FBDeviceCrashLogCommands.h"
+#import "FBDeviceDebuggerCommands.h"
 #import "FBDeviceLogCommands.h"
 #import "FBDeviceScreenshotCommands.h"
 #import "FBDeviceSet+Private.h"
@@ -157,6 +156,35 @@
   return [FBiOSTargetFormat.fullFormat extractFrom:self];
 }
 
+#pragma mark Public
+
++ (NSOperatingSystemVersion)operatingSystemVersionFromString:(NSString *)string
+{
+  NSArray<NSString *> *components = [string componentsSeparatedByCharactersInSet:NSCharacterSet.punctuationCharacterSet];
+  NSOperatingSystemVersion version = {
+    .majorVersion = 0,
+    .minorVersion = 0,
+    .patchVersion = 0,
+  };
+  for (NSUInteger index = 0; index < components.count; index++) {
+    NSInteger value = components[index].integerValue;
+    switch (index) {
+      case 0:
+        version.majorVersion = value;
+        continue;
+      case 1:
+        version.minorVersion = value;
+        continue;
+      case 2:
+        version.patchVersion = value;
+        continue;
+      default:
+        continue;
+    }
+  }
+  return version;
+}
+
 #pragma mark Properties
 
 - (id<FBDeviceOperator>)deviceOperator
@@ -172,9 +200,19 @@
   return self.amDevice.modelName;
 }
 
-- (NSString *)systemVersion
+- (NSString *)productVersion
 {
-  return self.amDevice.systemVersion;
+  return self.amDevice.productVersion;
+}
+
+- (NSString *)buildVersion
+{
+  return self.amDevice.buildVersion;
+}
+
+- (NSOperatingSystemVersion)operatingSystemVersion
+{
+  return [FBDevice operatingSystemVersionFromString:self.productVersion];
 }
 
 - (FBiOSTargetScreenInfo *)screenInfo
@@ -184,21 +222,21 @@
 
 #pragma mark Forwarding
 
-+ (NSMutableArray<Class> *)commandResponders
++ (NSArray<Class> *)commandResponders
 {
   static dispatch_once_t onceToken;
-  static NSMutableArray<Class> *commandClasses;
+  static NSArray<Class> *commandClasses;
   dispatch_once(&onceToken, ^{
-    commandClasses = [[NSMutableArray alloc] init];
-    [commandClasses addObjectsFromArray:@[
+    commandClasses = @[
       FBDeviceApplicationCommands.class,
       FBDeviceApplicationDataCommands.class,
       FBDeviceCrashLogCommands.class,
+      FBDeviceDebuggerCommands.class,
       FBDeviceLogCommands.class,
       FBDeviceScreenshotCommands.class,
       FBDeviceVideoRecordingCommands.class,
       FBDeviceXCTestCommands.class,
-    ]];
+    ];
   });
   return commandClasses;
 }
@@ -207,17 +245,6 @@
 {
   // All commands are stateful
   return [NSSet setWithArray:self.commandResponders];
-}
-
-+ (BOOL)addForwardingCommandClass:(Class)class error:(NSError **)error
-{
-  if (![class conformsToProtocol:@protocol(FBiOSTargetCommand)]){
-    return [[FBDeviceControlError
-      describe:@"Failed to add forwarding class. Class does not conform to FBiOSTargetCommand protocol."]
-      failBool:error];
-  }
-  [[self commandResponders] addObject:class];
-  return YES;
 }
 
 - (id)forwardingTargetForSelector:(SEL)selector

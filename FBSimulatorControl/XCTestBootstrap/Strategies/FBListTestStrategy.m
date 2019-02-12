@@ -91,9 +91,9 @@
 
 - (FBFuture<NSArray<NSString *> *> *)listTests
 {
-  id<FBConsumableLineBuffer> shimConsumer = [FBLineBuffer consumableBuffer];
+  id<FBConsumableBuffer> shimConsumer = [FBLineBuffer consumableBuffer];
   return [[[FBProcessOutput
-    outputForFileConsumer:shimConsumer]
+    outputForDataConsumer:shimConsumer]
     providedThroughFile]
     onQueue:self.executor.workQueue fmap:^(id<FBProcessFileOutput> shimOutput) {
       return [self listTestsWithShimOutput:shimOutput shimConsumer:shimConsumer];
@@ -102,7 +102,7 @@
 
 #pragma mark Private
 
-- (FBFuture<NSArray<NSString *> *> *)listTestsWithShimOutput:(id<FBProcessFileOutput>)shimOutput shimConsumer:(id<FBConsumableLineBuffer>)shimConsumer
+- (FBFuture<NSArray<NSString *> *> *)listTestsWithShimOutput:(id<FBProcessFileOutput>)shimOutput shimConsumer:(id<FBConsumableBuffer>)shimConsumer
 {
   NSString *otestQueryShimPath = self.executor.queryShimPath;
   NSDictionary<NSString *, NSString *> *environment = @{
@@ -113,8 +113,8 @@
 
   return [[self.configuration
     listTestProcessWithEnvironment:environment
-    stdOutConsumer:[FBLoggingFileConsumer consumerWithLogger:self.logger]
-    stdErrConsumer:[FBLoggingFileConsumer consumerWithLogger:self.logger]
+    stdOutConsumer:[FBLoggingDataConsumer consumerWithLogger:self.logger]
+    stdErrConsumer:[FBLoggingDataConsumer consumerWithLogger:self.logger]
     executor:self.executor
     logger:self.logger]
     onQueue:self.executor.workQueue fmap:^(id<FBLaunchedProcess> processInfo) {
@@ -122,7 +122,7 @@
     }];
 }
 
-+ (FBFuture<NSArray<NSString *> *> *)launchedProcess:(id<FBLaunchedProcess>)processInfo shimOutput:(id<FBProcessFileOutput>)shimOutput shimConsumer:(id<FBConsumableLineBuffer>)shimConsumer queue:(dispatch_queue_t)queue
++ (FBFuture<NSArray<NSString *> *> *)launchedProcess:(id<FBLaunchedProcess>)processInfo shimOutput:(id<FBProcessFileOutput>)shimOutput shimConsumer:(id<FBConsumableBuffer>)shimConsumer queue:(dispatch_queue_t)queue
 {
   return [[[shimOutput
     startReading]
@@ -148,7 +148,7 @@
   }];
 }
 
-+ (FBFuture<NSNull *> *)onQueue:(dispatch_queue_t)queue confirmExit:(id<FBLaunchedProcess>)process closingOutput:(id<FBProcessFileOutput>)output consumer:(id<FBConsumableLineBuffer>)consumer
++ (FBFuture<NSNull *> *)onQueue:(dispatch_queue_t)queue confirmExit:(id<FBLaunchedProcess>)process closingOutput:(id<FBProcessFileOutput>)output consumer:(id<FBConsumableBuffer>)consumer
 {
   return [process.exitCode onQueue:queue fmap:^(NSNumber *exitCode) {
     if (exitCode.intValue != 0) {

@@ -239,7 +239,7 @@
 - (FBFuture *)_startTailLogToFile:(NSString *)logFilePath
 {
   NSError *error = nil;
-  FBFileWriter *logFileWriter = [FBFileWriter syncWriterForFilePath:logFilePath error:&error];
+  id<FBDataConsumer> logFileWriter = [FBFileWriter syncWriterForFilePath:logFilePath error:&error];
   if (logFileWriter == nil) {
     [self.logger logFormat:@"Could not create log file at %@: %@", self.configuration.osLogPath, error];
     return [FBFuture futureWithResult:NSNull.null];
