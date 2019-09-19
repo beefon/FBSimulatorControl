@@ -80,6 +80,7 @@ FBOSVersionName const FBOSVersionNameiOS_11_3 = @"iOS 11.3";
 FBOSVersionName const FBOSVersionNameiOS_11_4 = @"iOS 11.4";
 FBOSVersionName const FBOSVersionNameiOS_12_0 = @"iOS 12.0";
 FBOSVersionName const FBOSVersionNameiOS_12_1 = @"iOS 12.1";
+FBOSVersionName const FBOSVersionNameiOS_12_2 = @"iOS 12.2";
 FBOSVersionName const FBOSVersionNametvOS_9_0 = @"tvOS 9.0";
 FBOSVersionName const FBOSVersionNametvOS_9_1 = @"tvOS 9.1";
 FBOSVersionName const FBOSVersionNametvOS_9_2 = @"tvOS 9.2";
@@ -402,6 +403,7 @@ FBOSVersionName const FBOSVersionNamewatchOS_5_1 = @"watchOS 5.1";
       [FBOSVersion iOSWithName:FBOSVersionNameiOS_11_4],
       [FBOSVersion iOSWithName:FBOSVersionNameiOS_12_0],
       [FBOSVersion iOSWithName:FBOSVersionNameiOS_12_1],
+      [FBOSVersion iOSWithName:FBOSVersionNameiOS_12_2],
       [FBOSVersion tvOSWithName:FBOSVersionNametvOS_9_0],
       [FBOSVersion tvOSWithName:FBOSVersionNametvOS_9_1],
       [FBOSVersion tvOSWithName:FBOSVersionNametvOS_9_2],

@@ -92,6 +92,8 @@ extern FBOSVersionName const FBOSVersionNameiOS_11_2;
 extern FBOSVersionName const FBOSVersionNameiOS_11_3;
 extern FBOSVersionName const FBOSVersionNameiOS_11_4;
 extern FBOSVersionName const FBOSVersionNameiOS_12_0;
+extern FBOSVersionName const FBOSVersionNameiOS_12_1;
+extern FBOSVersionName const FBOSVersionNameiOS_12_2;
 extern FBOSVersionName const FBOSVersionNametvOS_9_0;
 extern FBOSVersionName const FBOSVersionNametvOS_9_1;
 extern FBOSVersionName const FBOSVersionNametvOS_9_2;
