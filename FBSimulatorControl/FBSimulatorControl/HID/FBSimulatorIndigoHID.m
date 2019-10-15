@@ -217,7 +217,7 @@ IndigoMessage *(*IndigoHIDMessageForMouseNSEvent)(CGPoint *point0, CGPoint *poin
 
 + (IndigoMessage *)keyboardMessageWithDirection:(FBSimulatorHIDDirection)direction keyCode:(unsigned int)keycode messageSizeOut:(size_t *)messageSizeOut
 {
-  IndigoMessage *message = IndigoHIDMessageForKeyboardArbitrary((int) keycode, direction);
+  IndigoMessage *message = IndigoHIDMessageForKeyboardArbitrary((int) keycode, (int)direction);
   if (messageSizeOut) {
     *messageSizeOut = malloc_size(message);
   }
@@ -226,7 +226,7 @@ IndigoMessage *(*IndigoHIDMessageForMouseNSEvent)(CGPoint *point0, CGPoint *poin
 
 + (IndigoMessage *)buttonMessageWithDirection:(FBSimulatorHIDDirection)direction button:(FBSimulatorHIDButton)button messageSizeOut:(size_t *)messageSizeOut
 {
-  IndigoMessage *message = IndigoHIDMessageForButton((int) [self eventSourceForButton:button], direction, ButtonEventTargetHardware);
+  IndigoMessage *message = IndigoHIDMessageForButton((int) [self eventSourceForButton:button], (int)direction, ButtonEventTargetHardware);
   if (messageSizeOut) {
     *messageSizeOut = malloc_size(message);
   }

@@ -481,6 +481,18 @@ static FBTestBundleConnectionState const FBTestBundleConnectionStateResultAvaila
   return nil;
 }
 
+- (id)_XCT_logDebugMessage:(NSString *)debugMessage
+{
+  [self.interface _XCT_logDebugMessage:debugMessage];
+  return nil;
+}
+
+- (id)_XCT_logMessage:(NSString *)message
+{
+  [self.interface _XCT_logMessage:message];
+  return nil;
+}
+
 @end
 
 #pragma clang diagnostic pop

@@ -3774,6 +3774,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = B401C979EFB6AC4600000000 /* mainGroup */;
