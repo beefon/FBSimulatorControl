@@ -80,6 +80,8 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic, copy, readonly, nullable) FBBinaryDescriptor *binary;
 
++ (BOOL)isApplicationAtPath:(NSString *)path;
+
 @end
 
 NS_ASSUME_NONNULL_END

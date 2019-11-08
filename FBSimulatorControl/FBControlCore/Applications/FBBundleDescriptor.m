@@ -151,4 +151,14 @@
     binary:self.binary];
 }
 
++ (BOOL)isApplicationAtPath:(NSString *)path
+{
+  BOOL isDirectory = NO;
+  BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory];
+    return path != nil
+        && [path hasSuffix:@".app"]
+        && exists
+        && isDirectory;
+}
+
 @end

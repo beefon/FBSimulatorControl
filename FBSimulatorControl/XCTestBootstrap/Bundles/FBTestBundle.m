@@ -95,11 +95,15 @@
   }
   if (self.sessionIdentifier) {
     NSError *innerError;
+    // module name cannot have - and ., but usually it matches the bundle name.
+    NSString *moduleName = [[testBundle.name
+                             stringByReplacingOccurrencesOfString:@"-" withString:@"_"]
+                            stringByReplacingOccurrencesOfString:@"." withString:@"_"];
     NSString *testConfigurationFileName = [NSString stringWithFormat:@"%@-%@.xctestconfiguration", testBundle.name, self.sessionIdentifier.UUIDString];
     testBundle.configuration = [FBTestConfiguration
       configurationWithFileManager:self.fileManager
       sessionIdentifier:self.sessionIdentifier
-      moduleName:testBundle.name
+      moduleName:moduleName
       testBundlePath:testBundle.path
       uiTesting:self.shouldInitializeForUITesting
       testsToRun:self.testsToRun

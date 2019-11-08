@@ -287,6 +287,18 @@ NSString *const KeyWorkingDirectory = @"working_directory";
     // Since we spawn process using app binary directly without installation, we need to manully copy
     // xctest framework to app's rpath so it can be found by dyld when we load test bundle later.
     [FBApplicationBundle copyFrameworkToApplicationAtPath:_runnerAppPath frameworkPath:xcTestFrameworkPath];
+      
+      // Since Xcode 11, XCTest.framework load XCTAutomationSupport.framework use LC_LOAD_DYLIB, so
+       // we need to make sure XCTAutomationSupport.framework is available at @rpath when we load test bundle.
+       if ([FBXcodeConfiguration.xcodeVersionNumber isGreaterThanOrEqualTo:[NSDecimalNumber decimalNumberWithString:@"11.0"]]) {
+         NSString *XCTAutomationSupportFrameworkPath =
+         [[FBXcodeConfiguration.developerDirectory
+           stringByAppendingPathComponent:@"Platforms/iPhoneSimulator.platform"]
+           stringByAppendingPathComponent:@"Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework"];
+
+         [FBListTestConfiguration copyFrameworkToApplicationAtPath:_runnerAppPath frameworkPath:XCTAutomationSupportFrameworkPath error:nil];
+       }
+
 
     FBApplicationBundle *appBundle = [FBApplicationBundle applicationWithPath:_runnerAppPath error:nil];
     return [FBXCTestProcess
@@ -335,6 +347,44 @@ NSString *const KeyWorkingDirectory = @"working_directory";
   }
   return [[FBListTestConfiguration alloc] initWithShims:shims environment:environment workingDirectory:workingDirectory testBundlePath:testBundlePath runnerAppPath:runnerAppPath waitForDebugger:waitForDebugger timeout:timeout];
 }
+
++ (NSString *)copyFrameworkToApplicationAtPath:(NSString *)appPath frameworkPath:(NSString *)frameworkPath error:(NSError **)error
+{
+  if (![FBBundleDescriptor isApplicationAtPath:appPath]) {
+    return nil;
+  }
+
+  NSFileManager *fileManager = NSFileManager.defaultManager;
+  NSString *frameworksDir = [appPath stringByAppendingPathComponent:@"Frameworks"];
+  BOOL isDirectory = NO;
+  if ([fileManager fileExistsAtPath:frameworksDir isDirectory:&isDirectory]) {
+    if (!isDirectory) {
+      return [[FBControlCoreError
+        describeFormat:@"%@ is not a directory", frameworksDir]
+        fail:error];
+    }
+  } else {
+    if (![fileManager createDirectoryAtPath:frameworksDir withIntermediateDirectories:NO attributes:nil error:error]) {
+      return [[FBControlCoreError
+        describeFormat:@"Create framework directory %@ failed", frameworksDir]
+        fail:error];
+    }
+  }
+
+  NSString *toPath = [frameworksDir stringByAppendingPathComponent:[frameworkPath lastPathComponent]];
+  if ([[NSFileManager defaultManager] fileExistsAtPath:toPath]) {
+    return appPath;
+  }
+
+  if (![fileManager copyItemAtPath:frameworkPath toPath:toPath error:error]) {
+    return [[FBControlCoreError
+      describeFormat:@"Error copying framework %@ to app %@.", frameworkPath, appPath]
+      fail:error];
+  }
+
+  return appPath;
+}
+
 
 @end
 
