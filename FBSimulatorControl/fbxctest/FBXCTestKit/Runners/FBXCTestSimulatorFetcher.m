@@ -121,13 +121,8 @@
 
 + (FBSimulatorConfiguration *)configurationForDestination:(FBXCTestDestinationiPhoneSimulator *)destination
 {
-  FBSimulatorConfiguration *configuration = [FBSimulatorConfiguration defaultConfiguration];
-  if (destination.model) {
-    configuration = [configuration withDeviceModel:destination.model];
-  }
-  if (destination.version) {
-    configuration = [configuration withOSNamed:destination.version];
-  }
+  FBSimulatorConfiguration *configuration =
+    [[FBSimulatorConfiguration withDeviceModel:destination.model] withOSNamed:destination.version];
   return configuration;
 }
 

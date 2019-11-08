@@ -104,6 +104,9 @@ static NSString *KeyPlatformMacOS = @"macos";
   if (!self) {
     return nil;
   }
+    
+    NSParameterAssert(model);
+    NSParameterAssert(version);
 
   _model = model;
   _version = version;

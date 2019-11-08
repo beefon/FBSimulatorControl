@@ -304,7 +304,7 @@ NSString *const FBWatchdogSettingsArgName = @"-watchdog-settings";
 
 + (FBXCTestDestination *)destinationWithArguments:(NSArray<NSString *> *)arguments error:(NSError **)error
 {
-  NSOrderedSet<NSString *> *argumentSet = [NSOrderedSet orderedSetWithArray:arguments];
+  NSArray<NSString *> *uniqueArguments = [[NSOrderedSet orderedSetWithArray:arguments] array];
   NSMutableOrderedSet<NSString *> *subset = [NSMutableOrderedSet orderedSetWithArray:arguments];
   NSArray<NSString *> *macOSXSDKArguments = @[@"-sdk", @"macosx"];
   NSArray<NSString *> *iPhoneSimulatorSDKArguments = @[@"-sdk", @"iphonesimulator"];
@@ -318,7 +318,7 @@ NSString *const FBWatchdogSettingsArgName = @"-watchdog-settings";
   // Check for an iPhoneSimulator Destination.
   subset = [NSMutableOrderedSet orderedSetWithArray:arguments];
   [subset intersectOrderedSet:[NSOrderedSet orderedSetWithArray:iPhoneSimulatorSDKArguments]];
-  NSString *destination = [self destinationArgumentFromArguments:argumentSet];
+  NSString *destination = [self destinationArgumentFromArguments:uniqueArguments];
   if (![subset.array isEqualToArray:iPhoneSimulatorSDKArguments] && !destination) {
     return [[FBXCTestError
       describeFormat:@"No valid SDK or Destination provided in %@", [FBCollectionInformation oneLineDescriptionFromArray:arguments]]
@@ -326,7 +326,9 @@ NSString *const FBWatchdogSettingsArgName = @"-watchdog-settings";
   }
   // No Destination exists so return early.
   if (!destination) {
-    return [[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:nil version:nil];
+      return [[FBXCTestError
+        describeFormat:@"No valid Destination provided in %@", [FBCollectionInformation oneLineDescriptionFromArray:arguments]]
+        fail:error];
   }
   // Extract the destination.
   FBOSVersionName os = nil;
@@ -337,7 +339,7 @@ NSString *const FBWatchdogSettingsArgName = @"-watchdog-settings";
   return [[FBXCTestDestinationiPhoneSimulator alloc] initWithModel:model version:os];
 }
 
-+ (NSString *)destinationArgumentFromArguments:(NSOrderedSet<NSString *> *)arguments
++ (NSString *)destinationArgumentFromArguments:(NSArray<NSString *> *)arguments
 {
   NSUInteger index = [arguments indexOfObject:@"-destination"];
   if (index == NSNotFound) {

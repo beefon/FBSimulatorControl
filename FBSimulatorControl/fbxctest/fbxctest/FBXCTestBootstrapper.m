@@ -39,7 +39,12 @@
 {
   NSUInteger index = [arguments indexOfObject:@"-workingDirectory"];
   if (index == NSNotFound) {
-    return [NSTemporaryDirectory() stringByAppendingPathComponent:NSProcessInfo.processInfo.globallyUniqueString];
+      [[NSException
+        exceptionWithName:NSInvalidArgumentException
+        reason:@"-workingDirectory is missing"
+        userInfo:nil]
+       raise];
+      return nil;
   } else {
     return [arguments objectAtIndex:index+1];
   }
