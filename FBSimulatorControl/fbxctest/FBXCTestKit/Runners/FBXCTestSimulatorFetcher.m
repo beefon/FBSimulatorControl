@@ -86,7 +86,7 @@
   FBSimulatorConfiguration *configuration = [FBXCTestSimulatorFetcher configurationForDestination:destination];
   return [self.simulatorControl.pool
     allocateSimulatorWithConfiguration:configuration
-    options:FBSimulatorAllocationOptionsCreate | FBSimulatorAllocationOptionsReuse];
+    options:FBSimulatorAllocationOptionsReuse];
 }
 
 - (FBFuture<FBSimulator *> *)fetchSimulatorForApplicationTest:(FBXCTestDestinationiPhoneSimulator *)destination
