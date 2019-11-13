@@ -29,13 +29,13 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Creates a Simulator Fetcher for the given configuration
 
- @param workingDirectory the working directory.
+ @param simulatorSetPath path to simulator set.
  @param configurators A collection of configurators that will preconfigure simulator before booting it.
  @param logger the logger to use.
  @param error an error out for any error that occurs.
  @return a Fetcher for the given Configuration.
  */
-+ (nullable instancetype)fetcherWithWorkingDirectory:(NSString *)workingDirectory
++ (nullable instancetype)fetcherWithSimulatorSetPath:(NSString *)simulatorSetPath
                            simulatorManagementOptios:(FBSimulatorManagementOptions)simulatorManagementOptions
                                        configurators:(NSArray<id<FBXCTestSimulatorConfigurator>> *)configurators
                                               logger:(nullable id<FBControlCoreLogger>)logger

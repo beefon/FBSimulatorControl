@@ -35,23 +35,19 @@
   return self;
 }
 
-- (NSString *)workingDirectory:(NSArray<NSString *> *)arguments
+- (NSString *)singleValueForArgument:(NSString *)argName arguments:(NSArray<NSString *> *)arguments
 {
-  NSUInteger index = [arguments indexOfObject:@"-workingDirectory"];
+  NSUInteger index = [arguments indexOfObject:argName];
   if (index == NSNotFound) {
       [[NSException
         exceptionWithName:NSInvalidArgumentException
-        reason:@"-workingDirectory is missing"
+        reason:[NSString stringWithFormat:@"%@ is missing", argName]
         userInfo:nil]
        raise];
       return nil;
   } else {
     return [arguments objectAtIndex:index+1];
   }
-}
-
-- (BOOL)definesReusableWorkingDirectory:(NSArray<NSString *> *)arguments {
-  return [arguments containsObject:@"-workingDirectory"];
 }
 
 - (NSTimeInterval)timeout:(NSArray<NSString *> *)arguments {
@@ -72,15 +68,21 @@
   [self.logger.debug logFormat:@"fbxctest arguments: %@", [FBCollectionInformation oneLineDescriptionFromArray:arguments]];
   [self.logger.debug logFormat:@"xcode configuration: %@", [FBCollectionInformation oneLineDescriptionFromDictionary:FBXcodeConfiguration.new.jsonSerializableRepresentation]];
   
-  NSString *workingDirectory = [self workingDirectory:arguments];
+  NSString *simulatorSetPath = [self singleValueForArgument:@"-simulatorSetPath" arguments:arguments];
+  NSString *workingDirectory = [self singleValueForArgument:@"-workingDirectory" arguments:arguments];
   
-  if (![NSFileManager.defaultManager createDirectoryAtPath:workingDirectory withIntermediateDirectories:YES attributes:nil error:&error]) {
+  BOOL isDirectory = NO;
+  if (![NSFileManager.defaultManager fileExistsAtPath:simulatorSetPath isDirectory:&isDirectory] || !isDirectory) {
+    return [self printErrorMessage:error file:__FILE__ line:__LINE__];
+  }
+  if (![NSFileManager.defaultManager fileExistsAtPath:workingDirectory isDirectory:&isDirectory] || !isDirectory) {
     return [self printErrorMessage:error file:__FILE__ line:__LINE__];
   }
   
   FBXCTestCommandLine *commandLine = [FBXCTestCommandLine
     commandLineFromArguments:arguments
     processUnderTestEnvironment:NSProcessInfo.processInfo.environment
+    simulatorSetPath:simulatorSetPath
     workingDirectory:workingDirectory
     timeout:[self timeout:arguments]
     logger:self.logger
@@ -93,13 +95,8 @@
   FBXCTestContext *context = [FBXCTestContext contextWithReporter:reporter logger:self.logger];
 
   [self.logger.info logFormat:@"Bootstrapping Test Runner with Configuration %@", [FBCollectionInformation oneLineJSONDescription:commandLine.configuration]];
-  FBXCTestBaseRunner *testRunner = [FBXCTestBaseRunner testRunnerWithCommandLine:commandLine context:context];
+  FBXCTestBaseRunner *testRunner = [FBXCTestBaseRunner testRunnerWithCommandLine:commandLine context:context simulatorSetPath:simulatorSetPath];
   if (![[testRunner execute] await:&error]) {
-    return [self printErrorMessage:error file:__FILE__ line:__LINE__];
-  }
-
-  if (![self definesReusableWorkingDirectory:arguments] &&
-      ![NSFileManager.defaultManager removeItemAtPath:workingDirectory error:&error]) {
     return [self printErrorMessage:error file:__FILE__ line:__LINE__];
   }
 

@@ -27,12 +27,18 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param arguments the Arguments to the fbxctest process
  @param environment environment additions for the process under test.
- @param workingDirectory the Working Directory to use.
+ @param simulatorSetPath simulator set path.
  @Param timeout the timeout of the test.
  @param error an error out for any error that occurs
  @return a new test run configuration.
  */
-+ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory timeout:(NSTimeInterval)timeout logger:(nullable id<FBControlCoreLogger>)logger error:(NSError **)error;
++ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments
+                      processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment
+                                 simulatorSetPath:(NSString *)simulatorSetPath
+                                 workingDirectory:(NSString *)workingDirectory
+                                          timeout:(NSTimeInterval)timeout
+                                           logger:(nullable id<FBControlCoreLogger>)logger
+                                            error:(NSError **)error;
 
 /**
  The Designated Inititalizer

@@ -25,6 +25,7 @@
 
 @property (nonatomic, strong, readonly) FBXCTestCommandLine *commandLine;
 @property (nonatomic, strong, readonly) FBXCTestContext *context;
+@property (nonatomic, copy, readonly) NSString *simulatorSetPath;
 
 @end
 
@@ -32,12 +33,12 @@
 
 #pragma mark Initializers
 
-+ (instancetype)testRunnerWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context
++ (instancetype)testRunnerWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context simulatorSetPath:(NSString *)simulatorSetPath
 {
-  return [[self alloc] initWithCommandLine:commandLine context:context];
+  return [[self alloc] initWithCommandLine:commandLine context:context simulatorSetPath:simulatorSetPath];
 }
 
-- (instancetype)initWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context
+- (instancetype)initWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context simulatorSetPath:(NSString *)simulatorSetPath
 {
   self = [super init];
   if (!self) {
@@ -46,6 +47,7 @@
 
   _commandLine = commandLine;
   _context = context;
+  _simulatorSetPath = [simulatorSetPath copy];
 
   return self;
 }
@@ -95,7 +97,7 @@
 - (FBFuture<NSNull *> *)runiOSTest
 {
   return [[[self.context
-    simulatorForCommandLine:self.commandLine]
+    simulatorForCommandLine:self.commandLine simulatorSetPath:self.simulatorSetPath]
     timeout:self.commandLine.testPreparationTimeout waitingFor:@"Simulator to be fetched for a test"]
     onQueue:dispatch_get_main_queue() fmap:^(FBSimulator *simulator) {
       return [[self

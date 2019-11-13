@@ -54,9 +54,11 @@ NS_ASSUME_NONNULL_BEGIN
  Obtains the Simulator for an iOS Test Run.
 
  @param commmandLine the configuration to use.
+ @param simulatorSetPath simulator set path.
  @return A future that wraps the Simulator;.
  */
-- (FBFuture<FBSimulator *> *)simulatorForCommandLine:(FBXCTestCommandLine *)commmandLine;
+- (FBFuture<FBSimulator *> *)simulatorForCommandLine:(FBXCTestCommandLine *)commmandLine
+                                    simulatorSetPath:(NSString *)simulatorSetPath;
 
 /**
  Causes the Simulator to be released from the test run.

@@ -28,8 +28,11 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param commandLine the configuration from the commandline.
  @param context the context to run with.
+ @param simulatorSetPath Simulator Set Path
  */
-+ (instancetype)testRunnerWithCommandLine:(FBXCTestCommandLine *)commandLine context:(FBXCTestContext *)context;
++ (instancetype)testRunnerWithCommandLine:(FBXCTestCommandLine *)commandLine
+                                  context:(FBXCTestContext *)context
+                         simulatorSetPath:(NSString *)simulatorSetPath;
 
 @end
 

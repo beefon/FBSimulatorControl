@@ -46,10 +46,11 @@
 #pragma mark Public
 
 - (FBFuture<FBSimulator *> *)simulatorForCommandLine:(FBXCTestCommandLine *)commmandLine
+                                    simulatorSetPath:(NSString *)simulatorSetPath
 {
   if (!self.simulatorFetcher) {
     NSError *error = nil;
-    FBXCTestSimulatorFetcher *fetcher = [FBXCTestSimulatorFetcher fetcherWithWorkingDirectory:commmandLine.configuration.workingDirectory
+    FBXCTestSimulatorFetcher *fetcher = [FBXCTestSimulatorFetcher fetcherWithSimulatorSetPath:simulatorSetPath
                                                                     simulatorManagementOptios:commmandLine.simulatorManagementOptions
                                                                                 configurators:commmandLine.simulatorConfigurators
                                                                                        logger:self.logger

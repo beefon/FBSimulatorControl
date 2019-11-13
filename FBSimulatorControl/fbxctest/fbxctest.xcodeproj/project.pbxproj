@@ -270,7 +270,9 @@
 				AA24FFC21D4A70D600B429CD /* Frameworks */,
 				AA24FF991D4A6D8500B429CD /* Products */,
 			);
+			indentWidth = 2;
 			sourceTree = "<group>";
+			tabWidth = 2;
 		};
 		AA24FF991D4A6D8500B429CD /* Products */ = {
 			isa = PBXGroup;
@@ -447,6 +449,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = AA24FF8F1D4A6D8500B429CD;

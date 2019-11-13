@@ -28,15 +28,14 @@
 
 #pragma mark Initializers
 
-+ (nullable instancetype)fetcherWithWorkingDirectory:(NSString *)workingDirectory
++ (nullable instancetype)fetcherWithSimulatorSetPath:(NSString *)simulatorSetPath
                            simulatorManagementOptios:(FBSimulatorManagementOptions)simulatorManagementOptions
                                        configurators:(NSArray<id<FBXCTestSimulatorConfigurator>> *)configurators
                                               logger:(id<FBControlCoreLogger>)logger
                                                error:(NSError **)error
 {
-  NSString *setPath = [workingDirectory stringByAppendingPathComponent:@"sim"];
   FBSimulatorControlConfiguration *controlConfiguration = [FBSimulatorControlConfiguration
-    configurationWithDeviceSetPath:setPath
+    configurationWithDeviceSetPath:simulatorSetPath
     options:simulatorManagementOptions];
 
   NSError *innerError = nil;

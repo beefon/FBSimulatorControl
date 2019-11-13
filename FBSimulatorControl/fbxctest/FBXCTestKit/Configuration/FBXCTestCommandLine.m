@@ -60,7 +60,13 @@ NSString *const FBWatchdogSettingsArgName = @"-watchdog-settings";
 
 #pragma mark Parsing
 
-+ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment workingDirectory:(NSString *)workingDirectory timeout:(NSTimeInterval)timeout logger:(nullable id<FBControlCoreLogger>)logger error:(NSError **)error
++ (nullable instancetype)commandLineFromArguments:(NSArray<NSString *> *)arguments
+                      processUnderTestEnvironment:(NSDictionary<NSString *, NSString *> *)environment
+                                 simulatorSetPath:(NSString *)simulatorSetPath
+                                 workingDirectory:(NSString *)workingDirectory
+                                          timeout:(NSTimeInterval)timeout
+                                           logger:(nullable id<FBControlCoreLogger>)logger
+                                            error:(NSError **)error
 {
   FBXCTestDestination *destination = [self destinationWithArguments:arguments error:error];
   if (!destination) {
@@ -195,7 +201,10 @@ NSString *const FBWatchdogSettingsArgName = @"-watchdog-settings";
       // Ignore. This is handled when extracting the destination
     } else if ([argument isEqualToString:@"-destination"]) {
       // Ignore. This is handled when extracting the destination
-    }  else if ([argument isEqualToString:@"-workingDirectory"]) {
+    } else if ([argument isEqualToString:@"-simulatorSetPath"]) {
+      // Ignore. This is handled by the bootstrapper itself.
+      continue;
+    } else if ([argument isEqualToString:@"-workingDirectory"]) {
       // Ignore. This is handled by the bootstrapper itself.
       continue;
     } else if ([argument isEqualToString:@"-timeout"]) {
