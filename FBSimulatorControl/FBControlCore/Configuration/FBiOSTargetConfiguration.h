@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
@@ -101,6 +101,8 @@ extern FBOSVersionName const FBOSVersionNameiOS_12_2;
 extern FBOSVersionName const FBOSVersionNameiOS_12_4;
 extern FBOSVersionName const FBOSVersionNameiOS_13_0;
 extern FBOSVersionName const FBOSVersionNameiOS_13_1;
+extern FBOSVersionName const FBOSVersionNameiOS_13_2;
+extern FBOSVersionName const FBOSVersionNameiOS_13_3;
 extern FBOSVersionName const FBOSVersionNametvOS_9_0;
 extern FBOSVersionName const FBOSVersionNametvOS_9_1;
 extern FBOSVersionName const FBOSVersionNametvOS_9_2;
@@ -117,6 +119,8 @@ extern FBOSVersionName const FBOSVersionNametvOS_12_1;
 extern FBOSVersionName const FBOSVersionNametvOS_12_2;
 extern FBOSVersionName const FBOSVersionNametvOS_12_4;
 extern FBOSVersionName const FBOSVersionNametvOS_13_0;
+extern FBOSVersionName const FBOSVersionNametvOS_13_2;
+extern FBOSVersionName const FBOSVersionNametvOS_13_3;
 extern FBOSVersionName const FBOSVersionNamewatchOS_2_0;
 extern FBOSVersionName const FBOSVersionNamewatchOS_2_1;
 extern FBOSVersionName const FBOSVersionNamewatchOS_2_2;
@@ -131,6 +135,7 @@ extern FBOSVersionName const FBOSVersionNamewatchOS_5_1;
 extern FBOSVersionName const FBOSVersionNamewatchOS_5_2;
 extern FBOSVersionName const FBOSVersionNamewatchOS_5_3;
 extern FBOSVersionName const FBOSVersionNamewatchOS_6_0;
+extern FBOSVersionName const FBOSVersionNamewatchOS_6_1;
 extern FBOSVersionName const FBOSVersionNamemac;
 
 #pragma mark Screen
