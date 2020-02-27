@@ -25,6 +25,7 @@
 @interface FBSimulatorApplicationCommands ()
 
 @property (nonatomic, weak, readonly) FBSimulator *simulator;
+- (NSString *)patchedApplicationAtPath:(NSString *)path osVersion:(FBOSVersion *)osVersion;
 
 @end
 
@@ -50,6 +51,8 @@
 
 - (FBFuture<NSNull *> *)installApplicationWithPath:(NSString *)path
 {
+  path = [self patchedApplicationAtPath:path osVersion:self.simulator.osVersion];
+  
   return [[[FBApplicationBundle
     onQueue:self.simulator.asyncQueue findOrExtractApplicationAtPath:path logger:self.simulator.logger]
     onQueue:self.simulator.workQueue pop:^(FBExtractedApplication *extractedApplication) {
@@ -60,6 +63,23 @@
         [NSFileManager.defaultManager removeItemAtURL:future.result.extractedPath error:nil];
       }
     }];
+}
+
+- (NSString *)patchedApplicationAtPath:(NSString *)path osVersion:(FBOSVersion *)osVersion
+{
+  if (self.simulator.osVersion.number.doubleValue >= 12.2) {
+    NSFileManager *fileManager = [NSFileManager new];
+    NSString *patchedApplicationPath = [[NSTemporaryDirectory() stringByAppendingPathComponent:[NSUUID new].UUIDString] stringByAppendingPathExtension:@"app"];
+    
+    [fileManager copyItemAtPath:path toPath:patchedApplicationPath error:nil];
+    
+    NSString *libswiftCorePath = [patchedApplicationPath stringByAppendingPathComponent:@"Frameworks/libswiftCore.dylib"];
+    [fileManager removeItemAtPath:libswiftCorePath error:nil];
+    
+    return patchedApplicationPath;
+  } else {
+    return path;
+  }
 }
 
 - (FBFuture<NSNumber *> *)isApplicationInstalledWithBundleID:(NSString *)bundleID

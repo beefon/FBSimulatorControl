@@ -79,6 +79,8 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (FBApplicationBundle *)tableSearchApplication;
 
+- (FBApplicationBundle *)swiftAppWithUnitTestsApplication;
+
 /**
  A build of Apple's 'Table Search' Sample Application.
  Source is available at: https://developer.apple.com/library/ios/samplecode/TableSearch_UISearchController/Introduction/Intro.html#//apple_ref/doc/uid/TP40014683

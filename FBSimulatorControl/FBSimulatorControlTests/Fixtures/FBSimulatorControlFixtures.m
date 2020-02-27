@@ -23,6 +23,12 @@
   return [FBApplicationBundle applicationWithPath:path error:error];
 }
 
++ (FBApplicationBundle *)swiftAppWithUnitTestsApplicationWithError:(NSError **)error
+{
+  NSString *path = [[NSBundle bundleForClass:self] pathForResource:@"SwiftAppWithUnitTests" ofType:@"app"];
+  return [FBApplicationBundle applicationWithPath:path error:error];
+}
+
 + (NSString *)photo0Path
 {
   return [[NSBundle bundleForClass:self] pathForResource:@"photo0" ofType:@"png"];
@@ -82,6 +88,15 @@
 {
   NSError *error = nil;
   FBApplicationBundle *value = [FBSimulatorControlFixtures tableSearchApplicationWithError:&error];
+  XCTAssertNil(error);
+  XCTAssertNotNil(value);
+  return value;
+}
+
+- (FBApplicationBundle *)swiftAppWithUnitTestsApplication
+{
+  NSError *error = nil;
+  FBApplicationBundle *value = [FBSimulatorControlFixtures swiftAppWithUnitTestsApplicationWithError:&error];
   XCTAssertNil(error);
   XCTAssertNotNil(value);
   return value;

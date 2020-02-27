@@ -640,6 +640,8 @@
 		EEBD60951C908F8500298A07 /* FBCollectionInformation.m in Sources */ = {isa = PBXBuildFile; fileRef = EEBD60931C908F8500298A07 /* FBCollectionInformation.m */; };
 		EEBD60971C908FA200298A07 /* FBJSONConversion.h in Headers */ = {isa = PBXBuildFile; fileRef = EEBD60961C908FA200298A07 /* FBJSONConversion.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		EEF4497E1CE0A22200300C9F /* FBXCTestBootstrapFixtures.m in Sources */ = {isa = PBXBuildFile; fileRef = EEF4497C1CE0A22200300C9F /* FBXCTestBootstrapFixtures.m */; };
+		F8195528240839E300DD4125 /* SwiftAppWithUnitTests.app in Resources */ = {isa = PBXBuildFile; fileRef = F8195527240839E300DD4125 /* SwiftAppWithUnitTests.app */; };
+		F819552A24083AAA00DD4125 /* FBSimulatorApplicationCommandsTests.m in Sources */ = {isa = PBXBuildFile; fileRef = F819552924083AAA00DD4125 /* FBSimulatorApplicationCommandsTests.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1658,6 +1660,8 @@
 		EEF4497C1CE0A22200300C9F /* FBXCTestBootstrapFixtures.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FBXCTestBootstrapFixtures.m; sourceTree = "<group>"; };
 		EEFC63981FAC9FCF00715F55 /* FBTestRunStrategy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FBTestRunStrategy.h; sourceTree = "<group>"; };
 		EEFC63991FAC9FCF00715F55 /* FBTestRunStrategy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FBTestRunStrategy.m; sourceTree = "<group>"; };
+		F8195527240839E300DD4125 /* SwiftAppWithUnitTests.app */ = {isa = PBXFileReference; lastKnownFileType = wrapper.application; name = SwiftAppWithUnitTests.app; path = Fixtures/Binaries/SwiftAppWithUnitTests.app; sourceTree = SOURCE_ROOT; };
+		F819552924083AAA00DD4125 /* FBSimulatorApplicationCommandsTests.m */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.objc; path = FBSimulatorApplicationCommandsTests.m; sourceTree = "<group>"; tabWidth = 2; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2089,6 +2093,7 @@
 				AA3FD03F1C876E4F001093CA /* FBSimulatorSetTests.m */,
 				AA1D55581CD2755D00B84404 /* FBSimulatorTestInjectionTests.m */,
 				AAC94C5A20C5394100562E68 /* FBSimulatorTestPreparationStrategyTests.m */,
+				F819552924083AAA00DD4125 /* FBSimulatorApplicationCommandsTests.m */,
 			);
 			path = Integration;
 			sourceTree = "<group>";
@@ -2576,6 +2581,7 @@
 		AAAA67C31BC4FEBA00075197 /* Fixtures */ = {
 			isa = PBXGroup;
 			children = (
+				F8195527240839E300DD4125 /* SwiftAppWithUnitTests.app */,
 				AAAA67C71BC5018500075197 /* TableSearch.app */,
 				AAAA67C41BC4FED200075197 /* FBSimulatorControlFixtures.h */,
 				AAAA67C51BC4FED200075197 /* FBSimulatorControlFixtures.m */,
@@ -3811,6 +3817,7 @@
 				877123F31BDA797800530B1E /* video0.mp4 in Resources */,
 				05471D691D5991AF00232CB2 /* junitResult0.xml in Resources */,
 				AAD305201BD4D5B10047376E /* photo1.png in Resources */,
+				F8195528240839E300DD4125 /* SwiftAppWithUnitTests.app in Resources */,
 				AAAA67C91BC501BB00075197 /* TableSearch.app in Resources */,
 				AA6F22481C916A44009F5CE4 /* photo0.png in Resources */,
 			);
@@ -3998,6 +4005,7 @@
 				AA3FD04E1C876E4F001093CA /* FBSimulatorPoolTests.m in Sources */,
 				AA3FD04D1C876E4F001093CA /* FBSimulatorLaunchTests.m in Sources */,
 				AAEA3AAD1C90BF5B004F8409 /* FBControlCoreFixtures.m in Sources */,
+				F819552A24083AAA00DD4125 /* FBSimulatorApplicationCommandsTests.m in Sources */,
 				AA21258F1F04E08400FB6032 /* FBSimulatorHIDIntegrationTests.m in Sources */,
 				AAC94C5B20C5394200562E68 /* FBSimulatorTestPreparationStrategyTests.m in Sources */,
 				AA3FD04F1C876E4F001093CA /* FBSimulatorSetTests.m in Sources */,
